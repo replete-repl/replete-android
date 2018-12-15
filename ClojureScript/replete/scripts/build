@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+echo "Compiling ClojureScript..."
+clj -m cljs.main -O simple -t webworker -o main.js -co '{:static-fns true :language-in :es6}' -c replete.stub
+
+# Move into Android project
+mv main.js ../../app/src/main/assets/
+
+echo "Done."
