@@ -10,36 +10,31 @@
             android:layout_width="match_parent"
             android:layout_height="0dp" android:id="@+id/repl_history" app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" android:layout_marginBottom="8dp"
-            app:layout_constraintBottom_toTopOf="@+id/input_l" android:layout_marginLeft="8dp"
-            android:layout_marginStart="8dp" android:layout_marginEnd="8dp" android:layout_marginRight="8dp"/>
-    <android.support.design.widget.TextInputLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            app:layout_constraintStart_toStartOf="parent" android:layout_marginLeft="8dp"
-            android:layout_marginStart="8dp" android:orientation="horizontal" android:id="@+id/input_l"
-            app:layout_constraintBottom_toBottomOf="parent" android:layout_marginBottom="8dp"
-            app:layout_constraintEnd_toStartOf="@+id/eval_button" android:layout_marginEnd="8dp"
-            android:layout_marginRight="8dp">
-
-        <android.support.design.widget.TextInputEditText
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="text"
-                android:singleLine="true"
-                android:imeOptions="actionDone"
-                android:id="@+id/input" android:visibility="visible"
-        />
-    </android.support.design.widget.TextInputLayout>
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginLeft="8dp"
+            android:layout_marginStart="8dp"
+            app:layout_constraintBottom_toTopOf="@+id/input" android:dividerHeight="0dp">
+    </ListView>
     <Button
             android:text="Eval"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" android:id="@+id/eval_button" android:layout_weight="1"
+            android:layout_width="64dp"
+            android:layout_height="0dp" android:id="@+id/eval_button" android:layout_weight="1"
             style="@style/Widget.AppCompat.Button.Borderless.Colored"
             android:textColor="@android:color/holo_blue_dark" android:layout_marginEnd="8dp"
             android:layout_marginRight="8dp" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
             android:layout_marginBottom="8dp"
-            app:layout_constraintStart_toEndOf="@+id/input_l"/>
+            app:layout_constraintTop_toBottomOf="@+id/repl_history"/>
+    <EditText
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:inputType="textMultiLine"
+            android:ems="10"
+            android:id="@+id/input" android:layout_marginBottom="8dp"
+            app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintStart_toStartOf="parent"
+            android:layout_marginLeft="8dp" android:layout_marginStart="8dp"
+            app:layout_constraintEnd_toStartOf="@+id/eval_button"
+            android:layout_marginEnd="8dp" android:layout_marginRight="8dp" android:typeface="monospace"
+            android:textSize="14sp" android:textColor="@android:color/black"/>
 
 </android.support.constraint.ConstraintLayout>

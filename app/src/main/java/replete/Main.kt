@@ -85,7 +85,7 @@ class MainActivity : AppCompatActivity() {
 
         val vm = V8.createV8Runtime()
 
-        val inputField = findViewById<TextInputEditText>(R.id.input)
+        val inputField = findViewById<EditText>(R.id.input)
         val replHisotry = findViewById<ListView>(R.id.repl_history)
         val evalButton = findViewById<Button>(R.id.eval_button)
 
