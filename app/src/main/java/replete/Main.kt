@@ -120,7 +120,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 vm.executeScript("replete.repl.read_eval_print(\"$input\");")
             } catch (e: Exception) {
-                adapter.add(Item(e.toString(), ItemType.ERROR))
+//                adapter.add(Item(e.toString(), ItemType.ERROR))
             }
 
         }
@@ -164,9 +164,6 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             adapter.add(Item(e.toString(), ItemType.ERROR))
         }
-
-        adapter.notifyDataSetChanged()
-        adapter.notifyDataSetInvalidated()
 
     }
 }
