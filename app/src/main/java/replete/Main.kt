@@ -114,6 +114,7 @@ class MainActivity : AppCompatActivity() {
 
         evalButton.setOnClickListener { v ->
             val input = inputField.text.toString()
+            inputField.text.clear()
             adapter.add(Item(input, ItemType.INPUT))
 
             try {
@@ -129,8 +130,6 @@ class MainActivity : AppCompatActivity() {
                 val arg1 = parameters.get(0)
 
                 adapter.add(Item(markString(arg1.toString()), ItemType.OUTPUT))
-
-                inputField.text?.clear()
 
                 if (arg1 is Releasable) {
                     arg1.release()
