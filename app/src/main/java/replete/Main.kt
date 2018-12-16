@@ -23,8 +23,13 @@ enum class ItemType {
 
 data class Item(val text: String, val type: ItemType)
 
-class HistoryAdapter(context: Context, id: Int) :
+class HistoryAdapter(context: Context, id: Int, val parent: ListView) :
     ArrayAdapter<Item>(context, id) {
+
+    fun update(item: Item) {
+        this.add(item)
+        parent.smoothScrollToPosition(this.count - 1)
+    }
 
     private class ViewHolder(val item: TextView)
 
@@ -89,7 +94,7 @@ class MainActivity : AppCompatActivity() {
         val replHisotry = findViewById<ListView>(R.id.repl_history)
         val evalButton = findViewById<Button>(R.id.eval_button)
 
-        val adapter = HistoryAdapter(this, R.layout.list_item)
+        val adapter = HistoryAdapter(this, R.layout.list_item, replHisotry)
 
         replHisotry.adapter = adapter
         replHisotry.divider = null
@@ -115,12 +120,12 @@ class MainActivity : AppCompatActivity() {
         evalButton.setOnClickListener { v ->
             val input = inputField.text.toString()
             inputField.text.clear()
-            adapter.add(Item(input, ItemType.INPUT))
+            adapter.update(Item(input, ItemType.INPUT))
 
             try {
                 vm.executeScript("replete.repl.read_eval_print(\"$input\");")
             } catch (e: Exception) {
-//                adapter.add(Item(e.toString(), ItemType.ERROR))
+//                adapter.update(Item(e.toString(), ItemType.ERROR))
             }
 
         }
@@ -129,7 +134,7 @@ class MainActivity : AppCompatActivity() {
             if (parameters.length() > 0) {
                 val arg1 = parameters.get(0)
 
-                adapter.add(Item(markString(arg1.toString()), ItemType.OUTPUT))
+                adapter.update(Item(markString(arg1.toString()), ItemType.OUTPUT))
 
                 if (arg1 is Releasable) {
                     arg1.release()
@@ -151,7 +156,7 @@ class MainActivity : AppCompatActivity() {
             vm.executeScript("cljs.core.set_print_fn_BANG_.call(null, REPLETE_PRINT_FN);")
             vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
 
-            adapter.add(
+            adapter.update(
                 Item(
                     "\nClojureScript 1.10.439\n" +
                             "    Docs: (doc function-name)\n" +
@@ -162,7 +167,7 @@ class MainActivity : AppCompatActivity() {
                 )
             )
         } catch (e: Exception) {
-            adapter.add(Item(e.toString(), ItemType.ERROR))
+            adapter.update(Item(e.toString(), ItemType.ERROR))
         }
 
     }
