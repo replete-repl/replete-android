@@ -41,8 +41,8 @@ class HistoryAdapter(context: Context, id: Int) :
             if (item != null) {
                 viewHolder.item.text = item.text
                 when (item.type) {
-                    ItemType.INPUT -> viewHolder.item.setTextColor(Color.BLACK)
-                    ItemType.OUTPUT -> viewHolder.item.setTextColor(Color.DKGRAY)
+                    ItemType.INPUT -> viewHolder.item.setTextColor(Color.DKGRAY)
+                    ItemType.OUTPUT -> viewHolder.item.setTextColor(Color.BLACK)
                     ItemType.ERROR -> viewHolder.item.setTextColor(Color.RED)
                 }
             }
@@ -54,8 +54,8 @@ class HistoryAdapter(context: Context, id: Int) :
             if (item != null) {
                 viewHolder.item.text = item.text
                 when (item.type) {
-                    ItemType.INPUT -> viewHolder.item.setTextColor(Color.BLACK)
-                    ItemType.OUTPUT -> viewHolder.item.setTextColor(Color.DKGRAY)
+                    ItemType.INPUT -> viewHolder.item.setTextColor(Color.DKGRAY)
+                    ItemType.OUTPUT -> viewHolder.item.setTextColor(Color.BLACK)
                     ItemType.ERROR -> viewHolder.item.setTextColor(Color.RED)
                 }
             }
