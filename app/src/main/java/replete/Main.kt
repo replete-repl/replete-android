@@ -93,11 +93,7 @@ class MainActivity : AppCompatActivity() {
 
         replHisotry.adapter = adapter
         replHisotry.divider = null
-        replHisotry.dividerHeight = 0
 
-        inputField.typeface = Typeface.MONOSPACE
-        inputField.textSize = 14f
-        inputField.setTextColor(Color.parseColor("#000000"))
 
         inputField.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(p0: Editable?) {
@@ -113,10 +109,6 @@ class MainActivity : AppCompatActivity() {
         })
 
         inputField.isSelected = true
-
-        val loadingTextView = TextView(this)
-        loadingTextView.textSize = 14f
-        loadingTextView.typeface = Typeface.MONOSPACE
 
         evalButton.isEnabled = false
 
