@@ -91,13 +91,13 @@ class MainActivity : AppCompatActivity() {
         val vm = V8.createV8Runtime()
 
         val inputField = findViewById<EditText>(R.id.input)
-        val replHisotry = findViewById<ListView>(R.id.repl_history)
+        val replHistory = findViewById<ListView>(R.id.repl_history)
         val evalButton = findViewById<Button>(R.id.eval_button)
 
-        val adapter = HistoryAdapter(this, R.layout.list_item, replHisotry)
+        val adapter = HistoryAdapter(this, R.layout.list_item, replHistory)
 
-        replHisotry.adapter = adapter
-        replHisotry.divider = null
+        replHistory.adapter = adapter
+        replHistory.divider = null
 
 
         inputField.addTextChangedListener(object : TextWatcher {
