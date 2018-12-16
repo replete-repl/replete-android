@@ -2,19 +2,19 @@ package replete
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.Typeface
+import android.os.Build
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
-import android.support.design.widget.TextInputEditText
+import android.support.annotation.RequiresApi
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.*
 import android.widget.*
 import com.eclipsesource.v8.*
 import android.widget.TextView
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.content.ClipData
+import android.content.ClipboardManager
 
 
 enum class ItemType {
@@ -84,6 +84,7 @@ fun markString(s: String): String {
 
 class MainActivity : AppCompatActivity() {
 
+    @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -99,6 +100,58 @@ class MainActivity : AppCompatActivity() {
         replHistory.adapter = adapter
         replHistory.divider = null
 
+        var selectedPosition = -1
+        var selectedView: View? = null
+
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+        replHistory.setOnItemClickListener { parent, view, position, id ->
+            val item = parent.getItemAtPosition(position) as Item
+            if (item.type == ItemType.INPUT) {
+                if (position == selectedPosition) {
+                    selectedPosition = -1
+                    view.setBackgroundColor(Color.rgb(255, 255, 255))
+                } else {
+                    if (selectedPosition != -1 && selectedView != null) {
+                        (selectedView as View).setBackgroundColor(Color.rgb(255, 255, 255))
+                    }
+                    selectedPosition = position
+                    view.setBackgroundColor(Color.rgb(219, 220, 255))
+                    selectedView = view
+
+                    (selectedView as View).startActionMode(object : ActionMode.Callback {
+
+                        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+                            val inflater = mode.menuInflater
+                            inflater.inflate(R.menu.menu_actions, menu)
+                            return true
+                        }
+
+                        override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+                            return false
+                        }
+
+                        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+                            when (item.itemId) {
+                                R.id.copy_action -> {
+                                    val sitem = parent.getItemAtPosition(selectedPosition) as Item
+                                    clipboard.primaryClip = ClipData.newPlainText("input", sitem.text)
+                                    selectedPosition = -1
+                                    (selectedView as View).setBackgroundColor(Color.rgb(255, 255, 255))
+                                    mode.finish()
+                                    return true
+                                }
+                                else -> return false
+                            }
+                        }
+
+                        override fun onDestroyActionMode(mode: ActionMode?) {
+
+                        }
+                    }, ActionMode.TYPE_FLOATING)
+                }
+            }
+        }
 
         inputField.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(p0: Editable?) {
