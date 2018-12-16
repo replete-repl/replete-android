@@ -1,5 +1,6 @@
 package replete
 
+import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.support.v7.app.AppCompatActivity
@@ -7,13 +8,73 @@ import android.os.Bundle
 import android.support.design.widget.TextInputEditText
 import android.text.Editable
 import android.text.TextWatcher
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
+import android.widget.*
 import com.eclipsesource.v8.*
+import android.widget.TextView
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
+
+
+enum class ItemType {
+    INPUT, OUTPUT, ERROR
+}
+
+data class Item(val text: String, val type: ItemType)
+
+class HistoryAdapter(context: Context, id: Int) :
+    ArrayAdapter<Item>(context, id) {
+
+    private class ViewHolder(val item: TextView)
+
+    override fun getView(position: Int, itemView: View?, parent: ViewGroup): View {
+
+        val item = getItem(position)
+
+        if (itemView == null) {
+            val _itemView = LayoutInflater.from(this.context).inflate(R.layout.list_item, parent, false)
+            val viewHolder = ViewHolder(_itemView.findViewById(R.id.history_item))
+
+            _itemView.tag = viewHolder
+
+            if (item != null) {
+                viewHolder.item.text = item.text
+                when (item.type) {
+                    ItemType.INPUT -> viewHolder.item.setTextColor(Color.BLACK)
+                    ItemType.OUTPUT -> viewHolder.item.setTextColor(Color.DKGRAY)
+                    ItemType.ERROR -> viewHolder.item.setTextColor(Color.RED)
+                }
+            }
+
+            return _itemView
+        } else {
+            val viewHolder = itemView.tag as ViewHolder
+
+            if (item != null) {
+                viewHolder.item.text = item.text
+                when (item.type) {
+                    ItemType.INPUT -> viewHolder.item.setTextColor(Color.BLACK)
+                    ItemType.OUTPUT -> viewHolder.item.setTextColor(Color.DKGRAY)
+                    ItemType.ERROR -> viewHolder.item.setTextColor(Color.RED)
+                }
+            }
+
+            return itemView
+        }
+    }
+}
 
 fun markString(s: String): String {
-    return s.replace("\u001B\\[".toRegex(), "")
+    // black
+    // 34 blue
+    // 32 red: 0.0, green: 0.75, blue: 0.0
+    // 35 red: 0.75, green: 0.0, blue: 0.75
+    // 31 red: 1, green: 0.33, blue: 0.33
+    // 30 reset
+
+
+    return s.replace(Regex("\\u001B\\[(34|32|35|31|30)m"), "")
 }
 
 class MainActivity : AppCompatActivity() {
@@ -25,8 +86,14 @@ class MainActivity : AppCompatActivity() {
         val vm = V8.createV8Runtime()
 
         val inputField = findViewById<TextInputEditText>(R.id.input)
-        val outputView = findViewById<LinearLayout>(R.id.scroll_view_layout)
+        val replHisotry = findViewById<ListView>(R.id.repl_history)
         val evalButton = findViewById<Button>(R.id.eval_button)
+
+        val adapter = HistoryAdapter(this, R.layout.list_item)
+
+        replHisotry.adapter = adapter
+        replHisotry.divider = null
+        replHisotry.dividerHeight = 0
 
         inputField.typeface = Typeface.MONOSPACE
         inputField.textSize = 14f
@@ -45,6 +112,8 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        inputField.isSelected = true
+
         val loadingTextView = TextView(this)
         loadingTextView.textSize = 14f
         loadingTextView.typeface = Typeface.MONOSPACE
@@ -53,25 +122,12 @@ class MainActivity : AppCompatActivity() {
 
         evalButton.setOnClickListener { v ->
             val input = inputField.text.toString()
-            val inputTextView = TextView(this)
-
-
-            inputTextView.textSize = 14f
-            inputTextView.typeface = Typeface.MONOSPACE
-            inputTextView.text = input
-            inputTextView.setTextColor(Color.DKGRAY)
-
-            outputView.addView(inputTextView)
+            adapter.add(Item(input, ItemType.INPUT))
 
             try {
                 vm.executeScript("replete.repl.read_eval_print(\"$input\");")
             } catch (e: Exception) {
-                val outputTextView = TextView(this)
-                outputTextView.textSize = 14f
-                outputTextView.typeface = Typeface.MONOSPACE
-                outputTextView.setTextColor(Color.parseColor("#ff0000"))
-                outputTextView.text = e.toString()
-                outputView.addView(outputTextView)
+                adapter.add(Item(e.toString(), ItemType.ERROR))
             }
 
         }
@@ -80,14 +136,7 @@ class MainActivity : AppCompatActivity() {
             if (parameters.length() > 0) {
                 val arg1 = parameters.get(0)
 
-                val outputTextView = TextView(this)
-
-                outputTextView.setTextColor(Color.BLACK)
-                outputTextView.text = markString(arg1.toString())
-                outputTextView.textSize = 14f
-                outputTextView.typeface = Typeface.MONOSPACE
-
-                outputView.addView(outputTextView)
+                adapter.add(Item(markString(arg1.toString()), ItemType.OUTPUT))
 
                 inputField.text?.clear()
 
@@ -109,19 +158,24 @@ class MainActivity : AppCompatActivity() {
             vm.executeScript("replete.repl.setup_cljs_user();")
             vm.executeScript("replete.repl.init_app_env({'debug-build': false, 'target-simulator': false, 'user-interface-idiom': 'iPhone'});")
             vm.executeScript("cljs.core.set_print_fn_BANG_.call(null, REPLETE_PRINT_FN);")
+            vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
 
-            loadingTextView.setTextColor(Color.parseColor("#000000"))
-            loadingTextView.text = "\nClojureScript 1.10.439\n" +
-                    "    Docs: (doc function-name)\n" +
-                    "          (find-doc \"part-of-name\")\n" +
-                    "  Source: (source function-name)\n" +
-                    " Results: Stored in *1, *2, *3,\n" +
-                    "          an exception in *e\n"
+            adapter.add(
+                Item(
+                    "\nClojureScript 1.10.439\n" +
+                            "    Docs: (doc function-name)\n" +
+                            "          (find-doc \"part-of-name\")\n" +
+                            "  Source: (source function-name)\n" +
+                            " Results: Stored in *1, *2, *3,\n" +
+                            "          an exception in *e\n", ItemType.INPUT
+                )
+            )
         } catch (e: Exception) {
-            loadingTextView.setTextColor(Color.parseColor("#ff0000"))
-            loadingTextView.text = e.toString()
+            adapter.add(Item(e.toString(), ItemType.ERROR))
         }
 
-        outputView.addView(loadingTextView)
+        adapter.notifyDataSetChanged()
+        adapter.notifyDataSetInvalidated()
+
     }
 }
