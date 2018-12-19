@@ -12,3 +12,6 @@ pom.xml.asc
 main.js
 out
 .cpcache
+compiler
+.DS_Store
+aot-cache

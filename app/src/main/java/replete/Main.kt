@@ -185,12 +185,12 @@ class MainActivity : AppCompatActivity() {
 
         val REPLETE_PRINT_FN = JavaVoidCallback { receiver, parameters ->
             if (parameters.length() > 0) {
-                val arg1 = parameters.get(0)
+                val msg = parameters.get(0)
 
-                adapter.update(Item(markString(arg1.toString()), ItemType.OUTPUT))
+                adapter.update(Item(markString(msg.toString()), ItemType.OUTPUT))
 
-                if (arg1 is Releasable) {
-                    arg1.release()
+                if (msg is Releasable) {
+                    msg.release()
                 }
             }
         }
@@ -198,12 +198,15 @@ class MainActivity : AppCompatActivity() {
         vm.registerJavaMethod(REPLETE_PRINT_FN, "REPLETE_PRINT_FN");
 
         try {
-            val cljsMain = application.assets.open("main.js").bufferedReader().use { it.readText() }
+            val bundle = application.assets.open("main.js").bufferedReader().readText()
 
             vm.executeScript("REPLETE_LOAD = () => null;") // placeholder
-            vm.executeScript(cljsMain)
+
+            vm.executeScript(bundle)
+
             vm.executeScript("goog.provide('cljs.user');")
             vm.executeScript("goog.require('cljs.core');")
+            vm.executeScript("goog.require('replete.repl');")
             vm.executeScript("replete.repl.setup_cljs_user();")
             vm.executeScript("replete.repl.init_app_env({'debug-build': false, 'target-simulator': false, 'user-interface-idiom': 'iPhone'});")
             vm.executeScript("cljs.core.set_print_fn_BANG_.call(null, REPLETE_PRINT_FN);")

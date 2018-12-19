@@ -6,7 +6,7 @@ Interested in iOS instead? See [Replete for iOS](https://github.com/replete-repl
 
 # Running
 
-1. In the `ClojureScript/replete` directory, do `scripts/build`
+1. In the `ClojureScript/replete` directory, do `script/build_clj`
 1. Open Android project in your IDE and run the app on a device or in the simulator.
 
 # Contributing

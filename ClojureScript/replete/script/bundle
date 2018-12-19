@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+# Run this from the replete/ClojureScript/replete directory
+
+# Make sure we fail and exit on the command that actually failed.
+set -e
+set -o pipefail
+
+export CLOSURE_RELEASE="20180319"
+script/get-closure-compiler
+
+CLOSURE_OPTIMIZATIONS="${CLOSURE_OPTIMIZATIONS:-SIMPLE}"
+
+if [ "$FAST_BUILD" == "1" ]
+then
+  echo "Because this is a fast build, setting Closure Optimizations to NONE"
+  CLOSURE_OPTIMIZATIONS=NONE
+fi
+
+if [ "$CLOSURE_OPTIMIZATIONS" != "NONE" ]
+then
+  echo "### Optimizing bundled JavaScript with Closure Optimizations:" $CLOSURE_OPTIMIZATIONS
+fi
+
+cd out
+# We don't need to bundle the extra cljs/core$macros.cljc file
+rm -f cljs/core\$macros.cljc
+
+for file in `find . -name '*.js' -o -name '*.cljs' -o -name '*.cljc' -o -name '*.clj' -o -name '*.json'`
+do 
+file=${file:2}
+cp -p $file $file.bak
+if [ "$CLOSURE_OPTIMIZATIONS" != "NONE" ] && [ ${file: -3} == ".js" ] && [ "${file: -7}" != "deps.js" ] && [ "${file: -9}" != "bundle.js" ] && [ "${file: -6}" != "csv.js" ] && [ "${file: -19}" != "performancetimer.js" ]
+then
+  if [ ! -f $file.optim ] || [ $file -nt $file.optim ]
+  then
+    java -jar ../compiler/closure-compiler-v$CLOSURE_RELEASE.jar --compilation_level $CLOSURE_OPTIMIZATIONS --language_in ECMASCRIPT3 --language_out ECMASCRIPT3 --process_closure_primitives false --js $file --js_output_file $file.optim
+    echo -n "."
+  fi
+  cp $file.optim $file
+fi
+
+# mv $file.bak $file
+done
+
+# Create bundle archive
+echo "Packing sources..."
+find . \( -name '*.js' -o -name '*.cljs' -o -name '*.cljc' -o -name '*.clj' -o -name '*.json' \) | xargs tar -rf bundle.tar
+gzip -9 bundle.tar
+
+mv bundle.tar.gz ../../../app/src/main/assets/
+
+cd ..
+
+# We don't want git to suggest we commit this generated
+# output, so we suppress it here.
+# if [ -d ../../.git ]; then
+#   git update-index --assume-unchanged ../../Replete/bundle.c
+# fi;

@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+
+# Make sure we fail and exit on the command that actually failed.
+set -e
+set -o pipefail
+
+# Ensure pkg-config can find libs installed by homebrew.
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig/:/opt/local/lib/pkgconfig/
+
+# Check on some build dependencies:
+which pkg-config >/dev/null || $( echo "Error: please \"brew install pkg-config\"" >&2 ; exit 1 )
+which cmake >/dev/null || $( echo "Error: please \"brew install cmake\"" >&2 ; exit 1 )
+pkg-config zlib || $( echo "Error: please \"brew install zlib\"" >&2 ; exit 1 )
+pkg-config libzip || $( echo "Error: please \"brew install libzip\"" >&2 ; exit 1 )
+pkg-config icu-uc || $( echo "Error: please \"brew install icu4c\"" >&2 ; exit 1 )
+
+# Parse the command-line options:
+FAST_PLANCK=''
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --fast)
+      export FAST_PLANCK="--fast"
+      export FAST_BUILD=1
+      shift
+      ;;
+  esac
+done
+
+# Fetch and build planck:
+cd ../../../
+if [ ! -e planck ]; then
+  echo "Fetching planck"
+  curl -L https://github.com/planck-repl/planck/archive/master.tar.gz | gunzip | tar x
+  ln -s planck-master planck
+fi
+cd -
+
+cd ../../../planck
+if [ ! -e planck-c/build/planck ]; then
+  echo "Building planck"
+  osascript -e 'display notification "Building planck..." with title "Replete"'
+  script/build $FAST_PLANCK
+fi
+cd -
+
+mkdir -p aot-cache
+lein deps
+M2_REPO=~/.m2/repository
+echo "AOT compiling macros"
+../../../planck/planck-c/build/planck -q -k aot-cache -c $M2_REPO/andare/andare/0.9.0/andare-0.9.0.jar:$M2_REPO/org/clojure/test.check/0.10.0-alpha2/test.check-0.10.0-alpha2.jar:$M2_REPO/chivorcam/chivorcam/0.3.0/chivorcam-0.3.0.jar <<REPL_INPUT
+(require '[clojure.test.check.clojure-test :include-macros true])
+(require-macros
+  'chivorcam.core
+  'clojure.test.check.properties
+  'cljs.core.async
+  'cljs.core.async.macros
+  'cljs.core.async.impl.ioc-macros)
+REPL_INPUT
+
+mkdir -p out/clojure/test/check
+mkdir -p out/cljs/analyzer
+mkdir -p out/cljs/spec/test
+mkdir -p out/cljs/spec/gen
+mkdir -p out/cljs/core/async/impl
+mkdir -p out/chivorcam
+
+# Complete Hack: Copy AOT'd macros from sibling Planck build tree
+# (We can't easily get Planck to build these for us because Planck bundles them)
+cp ../../../planck/planck-cljs/out/clojure/template* out/clojure
+cp ../../../planck/planck-cljs/out/cljs/spec/alpha\$macros.cache.json out/cljs/spec/alpha\$macros.cljc.cache.json
+cp ../../../planck/planck-cljs/out/cljs/spec/alpha\$macros.js out/cljs/spec/alpha\$macros.js
+cp ../../../planck/planck-cljs/out/cljs/spec/test/alpha\$macros.cache.json out/cljs/spec/test/alpha\$macros.cljc.cache.json
+cp ../../../planck/planck-cljs/out/cljs/spec/test/alpha\$macros.js out/cljs/spec/test/alpha\$macros.js
+cp ../../../planck/planck-cljs/out/cljs/spec/gen/alpha\$macros.cache.json out/cljs/spec/gen/alpha\$macros.cljc.cache.json
+cp ../../../planck/planck-cljs/out/cljs/spec/gen/alpha\$macros.js out/cljs/spec/gen/alpha\$macros.js
+cp ../../../planck/planck-cljs/out/cljs/test\$macros.cache.json out/cljs/test\$macros.cljc.cache.json
+cp ../../../planck/planck-cljs/out/cljs/test\$macros.js out/cljs/test\$macros.js
+
+# Note: --fast will cause some of these files to be missing.  These have been marked optional via '|| true'.
+cp aot-cache/clojure_SLASH_test_SLASH_check_SLASH_clojure_test\$macros.cache.json out/clojure/test/check/clojure_test\$macros.cljc.cache.json
+cp aot-cache/clojure_SLASH_test_SLASH_check_SLASH_clojure_test\$macros.js out/clojure/test/check/clojure_test\$macros.js
+cp aot-cache/clojure_SLASH_test_SLASH_check_SLASH_clojure_test\$macros.js.map.json out/clojure/test/check/clojure_test\$macros.cljc.map.json || true
+cp aot-cache/clojure_SLASH_test_SLASH_check_SLASH_properties\$macros.cache.json out/clojure/test/check/properties\$macros.cljc.cache.json
+cp aot-cache/clojure_SLASH_test_SLASH_check_SLASH_properties\$macros.js out/clojure/test/check/properties\$macros.js
+cp aot-cache/clojure_SLASH_test_SLASH_check_SLASH_properties\$macros.js.map.json out/clojure/test/check/properties\$macros.cljc.map.json
+cp aot-cache/cljs_SLASH_core_SLASH_async_SLASH_impl_SLASH_ioc_macros\$macros.cache.json out/cljs/core/async/impl/ioc_macros\$macros.clj.cache.json
+cp aot-cache/cljs_SLASH_core_SLASH_async_SLASH_impl_SLASH_ioc_macros\$macros.js out/cljs/core/async/impl/ioc_macros\$macros.js
+cp aot-cache/cljs_SLASH_core_SLASH_async_SLASH_impl_SLASH_ioc_macros\$macros.js.map.json out/cljs/core/async/impl/ioc_macros\$macros.clj.map.json || true
+cp aot-cache/cljs_SLASH_core_SLASH_async_SLASH_macros\$macros.cache.json out/cljs/core/async/macros\$macros.cljc.cache.json
+cp aot-cache/cljs_SLASH_core_SLASH_async_SLASH_macros\$macros.js out/cljs/core/async/macros\$macros.js
+cp aot-cache/cljs_SLASH_core_SLASH_async_SLASH_macros\$macros.js.map.json out/cljs/core/async/macros\$macros.cljc.map.json
+cp aot-cache/cljs_SLASH_core_SLASH_async\$macros.cache.json out/cljs/core/async\$macros.cljc.cache.json
+cp aot-cache/cljs_SLASH_core_SLASH_async\$macros.js out/cljs/core/async\$macros.js
+cp aot-cache/cljs_SLASH_core_SLASH_async\$macros.js.map.json out/cljs/core/async\$macros.cljc.map.json
+cp aot-cache/chivorcam_SLASH_core\$macros.cache.json out/chivorcam/core\$macros.cljc.cache.json
+cp aot-cache/chivorcam_SLASH_core\$macros.js out/chivorcam/core\$macros.js
+cp aot-cache/chivorcam_SLASH_core\$macros.js.map.json out/chivorcam/core\$macros.cljc.map.json
+
+echo "Compiling ClojureScript"
+osascript -e 'display notification "Compiling ClojureScript..." with title "Replete"'
+lein run -m clojure.main script/build.clj
+
+#script/bundle
