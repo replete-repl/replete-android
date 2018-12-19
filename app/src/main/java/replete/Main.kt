@@ -204,10 +204,8 @@ class MainActivity : AppCompatActivity() {
 
             vm.executeScript(bundle)
 
-            vm.executeScript("goog.provide('cljs.user');")
-            vm.executeScript("goog.require('cljs.core');")
-            vm.executeScript("goog.require('replete.repl');")
             vm.executeScript("replete.repl.setup_cljs_user();")
+            vm.executeScript("goog.require('replete.repl');")
             vm.executeScript("replete.repl.init_app_env({'debug-build': false, 'target-simulator': false, 'user-interface-idiom': 'iPhone'});")
             vm.executeScript("cljs.core.set_print_fn_BANG_.call(null, REPLETE_PRINT_FN);")
             vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
