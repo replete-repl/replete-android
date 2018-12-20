@@ -16,7 +16,6 @@ import android.widget.ArrayAdapter
 import android.content.ClipData
 import android.content.ClipboardManager
 
-
 enum class ItemType {
     INPUT, OUTPUT, ERROR
 }
@@ -187,6 +186,21 @@ class MainActivity : AppCompatActivity() {
 
         }
 
+        val REPLETE_LOAD = JavaCallback { receiver, parameters ->
+            if (parameters.length() > 0) {
+                val arg = parameters.get(0)
+                val path = arg.toString()
+
+                if (arg is Releasable) {
+                    arg.release()
+                }
+
+                return@JavaCallback this.bundle_get_contents(path)
+            } else {
+
+            }
+        }
+
         val REPLETE_PRINT_FN = JavaVoidCallback { receiver, parameters ->
             if (parameters.length() > 0) {
                 val msg = parameters.get(0)
@@ -216,6 +230,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        vm.registerJavaMethod(REPLETE_LOAD, "REPLETE_LOAD");
         vm.registerJavaMethod(REPLETE_PRINT_FN, "REPLETE_PRINT_FN");
         vm.registerJavaMethod(AMBLY_IMPORT_SCRIPT, "AMBLY_IMPORT_SCRIPT");
 
@@ -223,7 +238,6 @@ class MainActivity : AppCompatActivity() {
             val deps_file_path = "main.js"
             val goog_base_path = "goog/base.js"
 
-            vm.executeScript("REPLETE_LOAD = () => null;") // placeholder
             vm.executeScript("var global = this;")
 
             vm.executeScript("CLOSURE_IMPORT_SCRIPT = function(src) { AMBLY_IMPORT_SCRIPT('goog/' + src); return true; }")
