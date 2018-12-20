@@ -274,7 +274,7 @@ class MainActivity : AppCompatActivity() {
 
             adapter.update(
                 Item(
-                    "\nClojureScript 1.10.439\n" +
+                    "\nClojureScript ${this.getClojureScriptVersion()}\n" +
                             "    Docs: (doc function-name)\n" +
                             "          (find-doc \"part-of-name\")\n" +
                             "  Source: (source function-name)\n" +
@@ -286,5 +286,10 @@ class MainActivity : AppCompatActivity() {
             adapter.update(Item(e.toString(), ItemType.ERROR))
         }
 
+    }
+
+    fun getClojureScriptVersion(): String {
+        val s = this.bundle_get_contents("replete/bundle.js")
+        return s.substring(29, s.length).takeWhile { c -> c != " ".toCharArray()[0] }
     }
 }
