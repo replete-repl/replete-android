@@ -179,7 +179,7 @@ class MainActivity : AppCompatActivity() {
             adapter.update(Item(input, ItemType.INPUT))
 
             try {
-                vm.executeScript("replete.repl.read_eval_print(`$input`);")
+                vm.executeScript("""replete.repl.read_eval_print("${input.replace("\"", "\\\"")}");""")
             } catch (e: Exception) {
                 adapter.update(Item(e.toString(), ItemType.ERROR))
             }
