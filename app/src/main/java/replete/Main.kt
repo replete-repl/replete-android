@@ -181,7 +181,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 vm.executeScript("replete.repl.read_eval_print(`$input`);")
             } catch (e: Exception) {
-//                adapter.update(Item(e.toString(), ItemType.ERROR))
+                adapter.update(Item(e.toString(), ItemType.ERROR))
             }
 
         }
