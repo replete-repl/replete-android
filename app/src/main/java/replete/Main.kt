@@ -213,16 +213,24 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        val loadedLibs = mutableSetOf<String>()
+
         val AMBLY_IMPORT_SCRIPT = JavaVoidCallback { receiver, parameters ->
             if (parameters.length() > 0) {
                 val arg = parameters.get(0)
                 var path = arg.toString()
 
-                if (path.startsWith("goog/../")) {
-                    path = path.substring(8, path.length)
-                }
+                if (!loadedLibs.contains(path)) {
 
-                vm.executeScript(this.bundle_get_contents(path))
+                    loadedLibs.add(path)
+
+                    if (path.startsWith("goog/../")) {
+                        path = path.substring(8, path.length)
+                    }
+
+
+                    vm.executeScript(this.bundle_get_contents(path))
+                }
 
                 if (arg is Releasable) {
                     arg.release()
