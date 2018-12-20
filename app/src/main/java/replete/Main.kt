@@ -45,7 +45,7 @@ class HistoryAdapter(context: Context, id: Int, val parent: ListView) :
             if (item != null) {
                 viewHolder.item.text = item.text
                 when (item.type) {
-                    ItemType.INPUT -> viewHolder.item.setTextColor(Color.DKGRAY)
+                    ItemType.INPUT -> viewHolder.item.setTextColor(Color.GRAY)
                     ItemType.OUTPUT -> viewHolder.item.setTextColor(Color.BLACK)
                     ItemType.ERROR -> viewHolder.item.setTextColor(Color.RED)
                 }
@@ -58,7 +58,7 @@ class HistoryAdapter(context: Context, id: Int, val parent: ListView) :
             if (item != null) {
                 viewHolder.item.text = item.text
                 when (item.type) {
-                    ItemType.INPUT -> viewHolder.item.setTextColor(Color.DKGRAY)
+                    ItemType.INPUT -> viewHolder.item.setTextColor(Color.GRAY)
                     ItemType.OUTPUT -> viewHolder.item.setTextColor(Color.BLACK)
                     ItemType.ERROR -> viewHolder.item.setTextColor(Color.RED)
                 }
