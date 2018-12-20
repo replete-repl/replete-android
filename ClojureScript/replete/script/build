@@ -38,7 +38,6 @@ cd -
 cd ../../../planck
 if [ ! -e planck-c/build/planck ]; then
   echo "Building planck"
-  osascript -e 'display notification "Building planck..." with title "Replete"'
   script/build $FAST_PLANCK
 fi
 cd -
@@ -97,7 +96,7 @@ cp aot-cache/chivorcam_SLASH_core\$macros.js out/chivorcam/core\$macros.js
 cp aot-cache/chivorcam_SLASH_core\$macros.js.map.json out/chivorcam/core\$macros.cljc.map.json
 
 echo "Compiling ClojureScript"
-osascript -e 'display notification "Compiling ClojureScript..." with title "Replete"'
 lein run -m clojure.main script/build.clj
 
-#script/bundle
+# script/bundle
+cp -r out ../../app/src/main/assets/

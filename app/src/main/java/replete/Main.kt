@@ -84,6 +84,10 @@ fun markString(s: String): String {
 
 class MainActivity : AppCompatActivity() {
 
+    fun bundle_get_contents(path: String): String {
+        return assets.open("out/$path").bufferedReader().readText()
+    }
+
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -195,20 +199,64 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        val AMBLY_IMPORT_SCRIPT = JavaVoidCallback { receiver, parameters ->
+            if (parameters.length() > 0) {
+                val arg = parameters.get(0)
+                var path = arg.toString()
+
+                if (path.startsWith("goog/../")) {
+                    path = path.substring(8, path.length)
+                }
+
+                vm.executeScript(this.bundle_get_contents(path))
+
+                if (arg is Releasable) {
+                    arg.release()
+                }
+            }
+        }
+
         vm.registerJavaMethod(REPLETE_PRINT_FN, "REPLETE_PRINT_FN");
+        vm.registerJavaMethod(AMBLY_IMPORT_SCRIPT, "AMBLY_IMPORT_SCRIPT");
 
         try {
-            val bundle = application.assets.open("main.js").bufferedReader().readText()
+            val deps_file_path = "main.js"
+            val goog_base_path = "goog/base.js"
 
             vm.executeScript("REPLETE_LOAD = () => null;") // placeholder
+            vm.executeScript("var global = this;")
 
-            vm.executeScript(bundle)
+            vm.executeScript("CLOSURE_IMPORT_SCRIPT = function(src) { AMBLY_IMPORT_SCRIPT('goog/' + src); return true; }")
 
-            vm.executeScript("replete.repl.setup_cljs_user();")
+            vm.executeScript(this.bundle_get_contents(goog_base_path))
+            vm.executeScript(this.bundle_get_contents(deps_file_path))
+
+
+            vm.executeScript("goog.isProvided_ = function(x) { return false; };")
+            vm.executeScript("goog.require = function (name) { return CLOSURE_IMPORT_SCRIPT(goog.dependencies_.nameToPath[name]); };")
+            vm.executeScript("goog.require('cljs.core');")
+            vm.executeScript(
+                "cljs.core._STAR_loaded_libs_STAR_ = cljs.core.into.call(null, cljs.core.PersistentHashSet.EMPTY, [\"cljs.core\"]);\n" +
+                        "goog.require = function (name, reload) {\n" +
+                        "    if(!cljs.core.contains_QMARK_(cljs.core._STAR_loaded_libs_STAR_, name) || reload) {\n" +
+                        "        var AMBLY_TMP = cljs.core.PersistentHashSet.EMPTY;\n" +
+                        "        if (cljs.core._STAR_loaded_libs_STAR_) {\n" +
+                        "            AMBLY_TMP = cljs.core._STAR_loaded_libs_STAR_;\n" +
+                        "        }\n" +
+                        "        cljs.core._STAR_loaded_libs_STAR_ = cljs.core.into.call(null, AMBLY_TMP, [name]);\n" +
+                        "        CLOSURE_IMPORT_SCRIPT(goog.dependencies_.nameToPath[name]);\n" +
+                        "    }\n" +
+                        "};"
+            )
+
+            vm.executeScript("goog.provide('cljs.user');")
+            vm.executeScript("goog.require('cljs.core');")
             vm.executeScript("goog.require('replete.repl');")
+            vm.executeScript("replete.repl.setup_cljs_user();")
             vm.executeScript("replete.repl.init_app_env({'debug-build': false, 'target-simulator': false, 'user-interface-idiom': 'iPhone'});")
             vm.executeScript("cljs.core.set_print_fn_BANG_.call(null, REPLETE_PRINT_FN);")
             vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
+            vm.executeScript("var window = global;")
 
             adapter.update(
                 Item(

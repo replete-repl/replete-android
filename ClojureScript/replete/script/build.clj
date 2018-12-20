@@ -15,8 +15,7 @@
 (api/build (api/inputs "src")
   {:output-dir         "out"
    :output-to          "out/main.js"
-   :language-in :es6
-   :optimizations      :simple
+   :optimizations      :none
    :static-fns         true
    :optimize-constants false
    :dump-core          false})
@@ -41,12 +40,12 @@
 #_(copy-source "cljs/core/specs/alpha.cljc")
 #_(copy-source "cljs/core/specs/alpha.cljs")
 
-#_(let [res (io/resource "cljs/core.cljs.cache.aot.edn")
+(let [res (io/resource "cljs/core.cljs.cache.aot.edn")
       cache (read-string (slurp res))]
   (doseq [key (keys cache)]
     (write-cache (key cache) (str "out/cljs/core.cljs.cache.aot." (munge key) ".json"))))
 
-#_(let [res "out/cljs/core$macros.cljc.cache.json"
+(let [res "out/cljs/core$macros.cljc.cache.json"
       cache (transit/read (transit/reader (FileInputStream. res) :json))]
   (doseq [key (keys cache)]
     (write-cache (key cache) (str "out/cljs/core$macros.cljc.cache." (munge key) ".json"))))
