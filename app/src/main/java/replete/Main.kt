@@ -238,9 +238,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        val REPLETE_HIGH_RES_TIMER = JavaCallback { receiver, parameters ->
+            return@JavaCallback System.nanoTime() / 1e6
+        }
+
         vm.registerJavaMethod(REPLETE_LOAD, "REPLETE_LOAD");
         vm.registerJavaMethod(REPLETE_PRINT_FN, "REPLETE_PRINT_FN");
         vm.registerJavaMethod(AMBLY_IMPORT_SCRIPT, "AMBLY_IMPORT_SCRIPT");
+        vm.registerJavaMethod(REPLETE_HIGH_RES_TIMER, "REPLETE_HIGH_RES_TIMER");
 
         try {
             val deps_file_path = "main.js"
@@ -276,6 +281,7 @@ class MainActivity : AppCompatActivity() {
             vm.executeScript("goog.require('replete.repl');")
             vm.executeScript("replete.repl.setup_cljs_user();")
             vm.executeScript("replete.repl.init_app_env({'debug-build': false, 'target-simulator': false, 'user-interface-idiom': 'iPhone'});")
+            vm.executeScript("cljs.core.system_time = REPLETE_HIGH_RES_TIMER;")
             vm.executeScript("cljs.core.set_print_fn_BANG_.call(null, REPLETE_PRINT_FN);")
             vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
             vm.executeScript("var window = global;")
