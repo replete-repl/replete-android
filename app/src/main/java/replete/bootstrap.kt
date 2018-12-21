@@ -1,10 +1,8 @@
 package replete
 
 import android.support.v7.app.AppCompatActivity
-import com.eclipsesource.v8.JavaCallback
-import com.eclipsesource.v8.JavaVoidCallback
-import com.eclipsesource.v8.Releasable
-import com.eclipsesource.v8.V8
+import com.eclipsesource.v8.*
+
 
 fun bootstrap(ctx: AppCompatActivity, vm: V8, adapter: HistoryAdapter) {
 
@@ -73,10 +71,69 @@ fun bootstrap(ctx: AppCompatActivity, vm: V8, adapter: HistoryAdapter) {
         }
     }
 
+    var timeoutId: Long = 0
+    val timeouts: MutableMap<Long, Runnable> = mutableMapOf()
+
+    fun setTimeout(callback: () -> Unit, t: Long): Long {
+
+        if (timeoutId == 9007199254740991) {
+            timeoutId = 0;
+        } else {
+            ++timeoutId;
+        }
+
+        val runnable = Runnable { callback() }
+        timeouts.set(timeoutId, runnable)
+        android.os.Handler().postDelayed(runnable, t)
+
+        return timeoutId
+    }
+
+    fun cancelTimeout(tid: Long) {
+        if (timeouts.contains(tid)) {
+            android.os.Handler().removeCallbacks(timeouts.get(tid))
+            timeouts.remove(tid)
+        }
+    }
+
+    val REPLETE_SET_TIMEOUT = JavaCallback { receiver, parameters ->
+        if (parameters.length() > 0) {
+            val arg1 = parameters.get(0)
+            val arg2 = parameters.get(1)
+
+            val tid = setTimeout(fun() {
+                val callback = arg1 as V8Function
+                callback.call(callback, V8Array(vm))
+                arg1.release()
+                if (arg2 is Releasable) {
+                    arg2.release()
+                }
+            }, arg2 as Long or 4)
+
+            return@JavaCallback tid
+        } else {
+        }
+    }
+
+    val REPLETE_CANCEL_TIMEOUT = JavaVoidCallback { receiver, parameters ->
+        if (parameters.length() > 0) {
+            val arg1 = parameters.get(0)
+
+            cancelTimeout(arg1 as Long)
+
+            if (arg1 is Releasable) {
+                arg1.release()
+            }
+        } else {
+        }
+    }
+
     vm.registerJavaMethod(REPLETE_LOAD, "REPLETE_LOAD");
     vm.registerJavaMethod(REPLETE_PRINT_FN, "REPLETE_PRINT_FN");
     vm.registerJavaMethod(AMBLY_IMPORT_SCRIPT, "AMBLY_IMPORT_SCRIPT");
     vm.registerJavaMethod(REPLETE_HIGH_RES_TIMER, "REPLETE_HIGH_RES_TIMER");
+    vm.registerJavaMethod(REPLETE_SET_TIMEOUT, "setTimeout");
+    vm.registerJavaMethod(REPLETE_CANCEL_TIMEOUT, "clearTimeout");
 
     try {
         val deps_file_path = "main.js"
