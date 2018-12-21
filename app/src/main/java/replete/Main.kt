@@ -33,7 +33,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val vm = V8.createV8Runtime()
+        val vm: V8 = time<V8>("VM INIT", {V8.createV8Runtime()})
 
         val inputField = findViewById<EditText>(R.id.input)
         val replHistory = findViewById<ListView>(R.id.repl_history)
