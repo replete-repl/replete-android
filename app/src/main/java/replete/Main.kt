@@ -34,7 +34,6 @@ class MainActivity : AppCompatActivity() {
     private var isVMLoaded = false
 
     private var adapter: HistoryAdapter? = null
-    private var inputField: EditText? = null
 
     private fun bundleGetContents(path: String): String {
         return assets.open("out/$path").bufferedReader().readText()
@@ -45,15 +44,15 @@ class MainActivity : AppCompatActivity() {
         return s.substring(29, s.length).takeWhile { c -> c != " ".toCharArray()[0] }
     }
 
-    private fun runPoorMansParinfer(s: Editable) {
-        val cursorPos = inputField!!.selectionStart
+    private fun runPoorMansParinfer(inputField: EditText, s: Editable) {
+        val cursorPos = inputField.selectionStart
         if (cursorPos == 1) {
             when (s.toString()) {
                 "(" -> s.append(")")
                 "[" -> s.append("]")
                 "{" -> s.append("}")
             }
-            inputField!!.setSelection(cursorPos)
+            inputField.setSelection(cursorPos)
         }
     }
 
@@ -263,7 +262,7 @@ class MainActivity : AppCompatActivity() {
                         if (isVMLoaded) {
 
                         } else {
-                            runPoorMansParinfer(s)
+                            runPoorMansParinfer(inputField, s)
                         }
                     } else {
                         isParinferChange = false
@@ -314,8 +313,7 @@ class MainActivity : AppCompatActivity() {
             vm,
             adapter!!,
             { isVMLoaded = true },
-            { s -> bundleGetContents(s) },
-            { f -> runOnUiThread(f) }).execute()
+            { s -> bundleGetContents(s) }).execute()
     }
 }
 
@@ -339,21 +337,15 @@ class BootstrapTask(
     val vm: V8,
     val adapter: HistoryAdapter,
     val onVMLoaded: () -> Unit,
-    val bundleGetContents: (String) -> String,
-    val runOnUiThread: (Runnable) -> Unit
+    val bundleGetContents: (String) -> String
 ) :
-    AsyncTask<Unit, Unit, Unit>() {
+    AsyncTask<Unit, Unit, Exception?>() {
+
     override fun onPreExecute() {
         vm.locker.release()
     }
 
-    override fun onPostExecute(result: Unit?) {
-        vm.locker.acquire()
-        onVMLoaded()
-    }
-
-    override fun doInBackground(vararg params: Unit?) {
-
+    override fun doInBackground(vararg params: Unit?): Exception? {
 
         try {
 
@@ -398,13 +390,21 @@ class BootstrapTask(
             vm.executeScript("var window = global;")
 
             vm.locker.release()
+
+            return null
         } catch (e: Exception) {
             if (vm.locker.hasLock()) {
                 vm.locker.release()
             }
-            runOnUiThread(Runnable {
-                adapter.update(Item(e.toString(), ItemType.ERROR))
-            })
+            return e
         }
+    }
+
+    override fun onPostExecute(error: Exception?) {
+        vm.locker.acquire()
+        if (error != null) {
+            adapter.update(Item(error.toString(), ItemType.ERROR))
+        }
+        onVMLoaded()
     }
 }
