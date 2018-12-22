@@ -15,6 +15,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.AsyncTask
 import android.os.Handler
+import android.text.SpannableStringBuilder
 
 fun markString(s: String): String {
     // black
@@ -42,18 +43,6 @@ class MainActivity : AppCompatActivity() {
     private fun getClojureScriptVersion(): String {
         val s = bundleGetContents("replete/bundle.js")
         return s.substring(29, s.length).takeWhile { c -> c != " ".toCharArray()[0] }
-    }
-
-    private fun runPoorMansParinfer(inputField: EditText, s: Editable) {
-        val cursorPos = inputField.selectionStart
-        if (cursorPos == 1) {
-            when (s.toString()) {
-                "(" -> s.append(")")
-                "[" -> s.append("]")
-                "{" -> s.append("}")
-            }
-            inputField.setSelection(cursorPos)
-        }
     }
 
     private var timeoutId: Long = 0
@@ -171,6 +160,32 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun runPoorMansParinfer(inputField: EditText, s: Editable) {
+        val cursorPos = inputField.selectionStart
+        if (cursorPos == 1) {
+            when (s.toString()) {
+                "(" -> s.append(")")
+                "[" -> s.append("]")
+                "{" -> s.append("}")
+            }
+            inputField.setSelection(cursorPos)
+        }
+    }
+
+    private fun runParinfer(inputField: EditText, s: Editable, enterPressed: Boolean) {
+        val cursorPos = inputField.selectionStart
+        val params = V8Array(vm).push(s.toString()).push(cursorPos).push(enterPressed)
+        val ret = vm.getObject("replete").getObject("repl").executeArrayFunction("format", params)
+        val text = ret[0] as String
+        val cursor = ret[1] as Int
+
+        inputField.text = SpannableStringBuilder(text)
+        inputField.setSelection(cursor)
+
+        params.release()
+        ret.release()
+    }
+
     private var selectedPosition = -1
     private var selectedView: View? = null
 
@@ -246,6 +261,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         var isParinferChange = false
+        var enterPressed = false
 
         inputField.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
@@ -260,7 +276,8 @@ class MainActivity : AppCompatActivity() {
                         isParinferChange = true
 
                         if (isVMLoaded) {
-
+                            runParinfer(inputField, s, enterPressed)
+                            enterPressed = false
                         } else {
                             runPoorMansParinfer(inputField, s)
                         }
@@ -274,7 +291,9 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
-
+                if (p0 != null && p0.length > p1 && p0[p1] == "\n"[0]) {
+                    enterPressed = true
+                }
             }
         })
 
@@ -284,7 +303,7 @@ class MainActivity : AppCompatActivity() {
             adapter!!.update(Item(input, ItemType.INPUT))
 
             try {
-                ExecuteScriptTask(vm).execute("""replete.repl.read_eval_print("${input.replace("\"", "\\\"")}");""")
+                ExecuteScriptTask(vm).execute("""replete.repl.read_eval_print(`${input.replace("\"", "\\\"")}`);""")
             } catch (e: Exception) {
                 adapter!!.update(Item(e.toString(), ItemType.ERROR))
             }
