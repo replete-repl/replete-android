@@ -1,25 +1,29 @@
 package replete
 
-import android.support.v7.app.AppCompatActivity
+import android.os.Handler
 import com.eclipsesource.v8.*
 
 
-fun bootstrap(ctx: AppCompatActivity, vm: V8, adapter: HistoryAdapter) {
+fun bootstrap(ctx: MainActivity, vm: V8, uiHandler: Handler) {
 
-    fun bundleGetContents(path: String): String {
-        return ctx.assets.open("out/$path").bufferedReader().readText()
-    }
-
-    fun getClojureScriptVersion(): String {
-        val s = bundleGetContents("replete/bundle.js")
-        return s.substring(29, s.length).takeWhile { c -> c != " ".toCharArray()[0] }
-    }
+    uiHandler.sendMessage(
+        uiHandler.obtainMessage(
+            0, Item(
+                "\nClojureScript ${ctx.getClojureScriptVersion()}\n" +
+                        "    Docs: (doc function-name)\n" +
+                        "          (find-doc \"part-of-name\")\n" +
+                        "  Source: (source function-name)\n" +
+                        " Results: Stored in *1, *2, *3,\n" +
+                        "          an exception in *e\n", ItemType.INPUT
+            )
+        )
+    )
 
     val REPLETE_PRINT_FN = JavaVoidCallback { receiver, parameters ->
         if (parameters.length() > 0) {
             val msg = parameters.get(0)
 
-            adapter.update(Item(markString(msg.toString()), ItemType.OUTPUT))
+            uiHandler.sendMessage(uiHandler.obtainMessage(0, Item(markString(msg.toString()), ItemType.OUTPUT)))
 
             if (msg is Releasable) {
                 msg.release()
@@ -43,7 +47,7 @@ fun bootstrap(ctx: AppCompatActivity, vm: V8, adapter: HistoryAdapter) {
                 }
 
 
-                vm.executeScript(bundleGetContents(path))
+                vm.executeScript(ctx.bundleGetContents(path))
             }
 
             if (arg is Releasable) {
@@ -65,7 +69,7 @@ fun bootstrap(ctx: AppCompatActivity, vm: V8, adapter: HistoryAdapter) {
                 arg.release()
             }
 
-            return@JavaCallback bundleGetContents(path)
+            return@JavaCallback ctx.bundleGetContents(path)
         } else {
 
         }
@@ -143,8 +147,8 @@ fun bootstrap(ctx: AppCompatActivity, vm: V8, adapter: HistoryAdapter) {
 
         vm.executeScript("CLOSURE_IMPORT_SCRIPT = function(src) { AMBLY_IMPORT_SCRIPT('goog/' + src); return true; }")
 
-        vm.executeScript(bundleGetContents(goog_base_path))
-        vm.executeScript(bundleGetContents(deps_file_path))
+        vm.executeScript(ctx.bundleGetContents(goog_base_path))
+        vm.executeScript(ctx.bundleGetContents(deps_file_path))
 
 
         vm.executeScript("goog.isProvided_ = function(x) { return false; };")
@@ -174,17 +178,8 @@ fun bootstrap(ctx: AppCompatActivity, vm: V8, adapter: HistoryAdapter) {
         vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
         vm.executeScript("var window = global;")
 
-        adapter.update(
-            Item(
-                "\nClojureScript ${getClojureScriptVersion()}\n" +
-                        "    Docs: (doc function-name)\n" +
-                        "          (find-doc \"part-of-name\")\n" +
-                        "  Source: (source function-name)\n" +
-                        " Results: Stored in *1, *2, *3,\n" +
-                        "          an exception in *e\n", ItemType.INPUT
-            )
-        )
+        uiHandler.sendMessage(uiHandler.obtainMessage(1))
     } catch (e: Exception) {
-        adapter.update(Item(e.toString(), ItemType.ERROR))
+        uiHandler.sendMessage(uiHandler.obtainMessage(0, Item(e.toString(), ItemType.ERROR)))
     }
 }

@@ -13,6 +13,10 @@ import android.widget.*
 import com.eclipsesource.v8.*
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.os.Handler
+import android.os.Message
+import android.os.Looper
+
 
 fun markString(s: String): String {
     // black
@@ -28,18 +32,87 @@ fun markString(s: String): String {
 
 class MainActivity : AppCompatActivity() {
 
+    var th: Handler? = null
+    var vmt: Thread? = null
+    var adapter: HistoryAdapter? = null
+    var uiHandler: UIHandler? = null
+    var isVMLoaded = false
+
+    class UIHandler(private val adapter: HistoryAdapter, val onVMLoaded: () -> Unit) : Handler() {
+        override fun handleMessage(msg: Message) {
+            when (msg.what) {
+                0 -> adapter.update(msg.obj as Item)
+                1 -> onVMLoaded()
+            }
+        }
+    }
+
+    class VMThreadHandler(val vm: V8) : Handler() {
+        override fun handleMessage(msg: Message) {
+            when (msg.what) {
+                0 -> vm.executeScript(msg.obj as String)
+            }
+        }
+    }
+
+    private fun createVMThread() {
+        val ctx = this
+        val t = object : Thread() {
+            override fun run() {
+                Looper.prepare()
+                val vm = V8.createV8Runtime()
+                th = VMThreadHandler(vm)
+                bootstrap(ctx, vm, uiHandler!!)
+                Looper.loop()
+            }
+        }
+        t.start()
+        vmt = t
+    }
+
+    private fun killVMThread() {
+        vmt!!.interrupt()
+    }
+
+    private fun executeScript(s: String) {
+        th!!.sendMessage(th!!.obtainMessage(0, s))
+    }
+
+    fun bundleGetContents(path: String): String {
+        return assets.open("out/$path").bufferedReader().readText()
+    }
+
+    fun getClojureScriptVersion(): String {
+        val s = bundleGetContents("replete/bundle.js")
+        return s.substring(29, s.length).takeWhile { c -> c != " ".toCharArray()[0] }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        killVMThread()
+    }
+
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
-        val vm: V8 = time<V8>("VM INIT", {V8.createV8Runtime()})
+        setContentView(R.layout.activity_main)
 
         val inputField = findViewById<EditText>(R.id.input)
         val replHistory = findViewById<ListView>(R.id.repl_history)
         val evalButton = findViewById<Button>(R.id.eval_button)
 
-        val adapter = HistoryAdapter(this, R.layout.list_item, replHistory)
+        inputField.hint = "Type in here"
+        inputField.setHintTextColor(Color.GRAY)
+
+        evalButton.isEnabled = false
+        evalButton.setTextColor(Color.GRAY)
+
+        adapter = HistoryAdapter(this, R.layout.list_item, replHistory)
+
+        uiHandler = UIHandler(adapter as HistoryAdapter) { isVMLoaded = true }
+
+        createVMThread()
 
         replHistory.adapter = adapter
         replHistory.divider = null
@@ -106,27 +179,26 @@ class MainActivity : AppCompatActivity() {
 
             override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
                 val s = inputField.text.toString()
-                evalButton.isEnabled = s.isNotBlank()
+                evalButton.isEnabled = s.isNotBlank() and isVMLoaded
+                if (evalButton.isEnabled) {
+                    evalButton.setTextColor(Color.rgb(0, 153, 204))
+                } else {
+                    evalButton.setTextColor(Color.GRAY)
+                }
             }
         })
-
-        inputField.isSelected = true
-
-        evalButton.isEnabled = false
 
         evalButton.setOnClickListener { v ->
             val input = inputField.text.toString()
             inputField.text.clear()
-            adapter.update(Item(input, ItemType.INPUT))
+            adapter!!.update(Item(input, ItemType.INPUT))
 
             try {
-                vm.executeScript("""replete.repl.read_eval_print("${input.replace("\"", "\\\"")}");""")
+                executeScript("""replete.repl.read_eval_print("${input.replace("\"", "\\\"")}");""")
             } catch (e: Exception) {
-                adapter.update(Item(e.toString(), ItemType.ERROR))
+                adapter!!.update(Item(e.toString(), ItemType.ERROR))
             }
 
         }
-
-        bootstrap(this, vm, adapter)
     }
 }
