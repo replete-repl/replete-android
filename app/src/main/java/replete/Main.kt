@@ -17,7 +17,6 @@ import android.os.Handler
 import android.os.Message
 import android.os.Looper
 
-
 fun markString(s: String): String {
     // black
     // 34 blue
@@ -85,6 +84,18 @@ class MainActivity : AppCompatActivity() {
     fun getClojureScriptVersion(): String {
         val s = bundleGetContents("replete/bundle.js")
         return s.substring(29, s.length).takeWhile { c -> c != " ".toCharArray()[0] }
+    }
+
+    private fun runPoorMansParinfer(inputField: EditText, s: Editable) {
+        val cursorPos = inputField.selectionStart
+        if (cursorPos == 1) {
+            when (s.toString()) {
+                "(" -> s.append(")")
+                "[" -> s.append("]")
+                "{" -> s.append("}")
+            }
+            inputField.setSelection(cursorPos)
+        }
     }
 
     override fun onDestroy() {
@@ -170,21 +181,36 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        var isParinferChange = false
+
         inputField.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(p0: Editable?) {
+            override fun afterTextChanged(s: Editable?) {
+                if (s != null) {
+                    evalButton.isEnabled = !s.isNullOrEmpty() and isVMLoaded
+                    if (evalButton.isEnabled) {
+                        evalButton.setTextColor(Color.rgb(0, 153, 204))
+                    } else {
+                        evalButton.setTextColor(Color.GRAY)
+                    }
+                    if (!s.isNullOrEmpty() and !isParinferChange) {
+                        isParinferChange = true
+
+                        if (isVMLoaded) {
+
+                        } else {
+                            runPoorMansParinfer(inputField, s)
+                        }
+                    } else {
+                        isParinferChange = false
+                    }
+                }
             }
 
             override fun beforeTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
             }
 
             override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
-                val s = inputField.text.toString()
-                evalButton.isEnabled = s.isNotBlank() and isVMLoaded
-                if (evalButton.isEnabled) {
-                    evalButton.setTextColor(Color.rgb(0, 153, 204))
-                } else {
-                    evalButton.setTextColor(Color.GRAY)
-                }
+
             }
         })
 
