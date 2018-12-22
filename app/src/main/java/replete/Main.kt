@@ -13,9 +13,8 @@ import android.widget.*
 import com.eclipsesource.v8.*
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.os.AsyncTask
 import android.os.Handler
-import android.os.Message
-import android.os.Looper
 
 fun markString(s: String): String {
     // black
@@ -31,77 +30,150 @@ fun markString(s: String): String {
 
 class MainActivity : AppCompatActivity() {
 
-    var th: Handler? = null
-    var vmt: Thread? = null
-    var adapter: HistoryAdapter? = null
-    var uiHandler: UIHandler? = null
-    var isVMLoaded = false
+    private val vm: V8 = V8.createV8Runtime()
+    private var isVMLoaded = false
 
-    class UIHandler(private val adapter: HistoryAdapter, val onVMLoaded: () -> Unit) : Handler() {
-        override fun handleMessage(msg: Message) {
-            when (msg.what) {
-                0 -> adapter.update(msg.obj as Item)
-                1 -> onVMLoaded()
-            }
-        }
-    }
+    private var adapter: HistoryAdapter? = null
+    private var inputField: EditText? = null
 
-    class VMThreadHandler(val vm: V8) : Handler() {
-        override fun handleMessage(msg: Message) {
-            when (msg.what) {
-                0 -> vm.executeScript(msg.obj as String)
-            }
-        }
-    }
-
-    private fun createVMThread() {
-        val ctx = this
-        val t = object : Thread() {
-            override fun run() {
-                Looper.prepare()
-                val vm = V8.createV8Runtime()
-                th = VMThreadHandler(vm)
-                bootstrap(ctx, vm, uiHandler!!)
-                Looper.loop()
-            }
-        }
-        t.start()
-        vmt = t
-    }
-
-    private fun killVMThread() {
-        vmt!!.interrupt()
-    }
-
-    private fun executeScript(s: String) {
-        th!!.sendMessage(th!!.obtainMessage(0, s))
-    }
-
-    fun bundleGetContents(path: String): String {
+    private fun bundleGetContents(path: String): String {
         return assets.open("out/$path").bufferedReader().readText()
     }
 
-    fun getClojureScriptVersion(): String {
+    private fun getClojureScriptVersion(): String {
         val s = bundleGetContents("replete/bundle.js")
         return s.substring(29, s.length).takeWhile { c -> c != " ".toCharArray()[0] }
     }
 
-    private fun runPoorMansParinfer(inputField: EditText, s: Editable) {
-        val cursorPos = inputField.selectionStart
+    private fun runPoorMansParinfer(s: Editable) {
+        val cursorPos = inputField!!.selectionStart
         if (cursorPos == 1) {
             when (s.toString()) {
                 "(" -> s.append(")")
                 "[" -> s.append("]")
                 "{" -> s.append("}")
             }
-            inputField.setSelection(cursorPos)
+            inputField!!.setSelection(cursorPos)
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        killVMThread()
+    private var timeoutId: Long = 0
+    private val timeouts: MutableMap<Long, Runnable> = mutableMapOf()
+
+    private fun setTimeout(callback: () -> Unit, t: Long): Long {
+
+        if (timeoutId == 9007199254740991) {
+            timeoutId = 0;
+        } else {
+            ++timeoutId;
+        }
+
+        val runnable = Runnable { callback() }
+        timeouts.set(timeoutId, runnable)
+        Handler().postDelayed(runnable, t)
+
+        return timeoutId
     }
+
+    private fun cancelTimeout(tid: Long) {
+        if (timeouts.contains(tid)) {
+            Handler().removeCallbacks(timeouts.get(tid))
+            timeouts.remove(tid)
+        }
+    }
+
+    private val repleteSetTimeout = JavaCallback { receiver, parameters ->
+        if (parameters.length() > 0) {
+            val arg1 = parameters.get(0)
+            val arg2 = parameters.get(1)
+
+            val tid = setTimeout(fun() {
+                val callback = arg1 as V8Function
+                callback.call(callback, V8Array(vm))
+                arg1.release()
+                if (arg2 is Releasable) {
+                    arg2.release()
+                }
+            }, arg2 as Long or 4)
+
+            return@JavaCallback tid
+        } else {
+        }
+    }
+
+    private val repleteCancelTimeout = JavaVoidCallback { receiver, parameters ->
+        if (parameters.length() > 0) {
+            val arg1 = parameters.get(0)
+
+            cancelTimeout(arg1 as Long)
+
+            if (arg1 is Releasable) {
+                arg1.release()
+            }
+        } else {
+        }
+    }
+
+    private val repleteHighResTimer = JavaCallback { receiver, parameters ->
+        System.nanoTime() / 1e6
+    }
+
+    private val repleteLoad = JavaCallback { receiver, parameters ->
+        if (parameters.length() > 0) {
+            val arg = parameters.get(0)
+            val path = arg.toString()
+
+            if (arg is Releasable) {
+                arg.release()
+            }
+
+            return@JavaCallback bundleGetContents(path)
+        } else {
+
+        }
+    }
+
+    private val loadedLibs = mutableSetOf<String>()
+
+    private val amblyImportScript = JavaVoidCallback { receiver, parameters ->
+        if (parameters.length() > 0) {
+            val arg = parameters.get(0)
+            var path = arg.toString()
+
+            if (!loadedLibs.contains(path)) {
+
+                loadedLibs.add(path)
+
+                if (path.startsWith("goog/../")) {
+                    path = path.substring(8, path.length)
+                }
+
+
+                vm.executeScript(bundleGetContents(path))
+            }
+
+            if (arg is Releasable) {
+                arg.release()
+            }
+        }
+    }
+
+    private val repletePrintFn = JavaVoidCallback { receiver, parameters ->
+        if (parameters.length() > 0) {
+            val msg = parameters.get(0)
+
+            runOnUiThread {
+                adapter!!.update(Item(markString(msg.toString()), ItemType.OUTPUT))
+            }
+
+            if (msg is Releasable) {
+                msg.release()
+            }
+        }
+    }
+
+    private var selectedPosition = -1
+    private var selectedView: View? = null
 
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -109,9 +181,9 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
-        val inputField = findViewById<EditText>(R.id.input)
-        val replHistory = findViewById<ListView>(R.id.repl_history)
-        val evalButton = findViewById<Button>(R.id.eval_button)
+        val inputField: EditText = findViewById(R.id.input)
+        val replHistory: ListView = findViewById(R.id.repl_history)
+        val evalButton: Button = findViewById(R.id.eval_button)
 
         inputField.hint = "Type in here"
         inputField.setHintTextColor(Color.GRAY)
@@ -121,15 +193,8 @@ class MainActivity : AppCompatActivity() {
 
         adapter = HistoryAdapter(this, R.layout.list_item, replHistory)
 
-        uiHandler = UIHandler(adapter as HistoryAdapter) { isVMLoaded = true }
-
-        createVMThread()
-
         replHistory.adapter = adapter
         replHistory.divider = null
-
-        var selectedPosition = -1
-        var selectedView: View? = null
 
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
@@ -198,7 +263,7 @@ class MainActivity : AppCompatActivity() {
                         if (isVMLoaded) {
 
                         } else {
-                            runPoorMansParinfer(inputField, s)
+                            runPoorMansParinfer(s)
                         }
                     } else {
                         isParinferChange = false
@@ -220,11 +285,126 @@ class MainActivity : AppCompatActivity() {
             adapter!!.update(Item(input, ItemType.INPUT))
 
             try {
-                executeScript("""replete.repl.read_eval_print("${input.replace("\"", "\\\"")}");""")
+                ExecuteScriptTask(vm).execute("""replete.repl.read_eval_print("${input.replace("\"", "\\\"")}");""")
             } catch (e: Exception) {
                 adapter!!.update(Item(e.toString(), ItemType.ERROR))
             }
 
+        }
+
+        adapter!!.update(
+            Item(
+                "\nClojureScript ${getClojureScriptVersion()}\n" +
+                        "    Docs: (doc function-name)\n" +
+                        "          (find-doc \"part-of-name\")\n" +
+                        "  Source: (source function-name)\n" +
+                        " Results: Stored in *1, *2, *3,\n" +
+                        "          an exception in *e\n", ItemType.INPUT
+            )
+        )
+
+        vm.registerJavaMethod(repleteLoad, "REPLETE_LOAD");
+        vm.registerJavaMethod(repletePrintFn, "REPLETE_PRINT_FN");
+        vm.registerJavaMethod(amblyImportScript, "AMBLY_IMPORT_SCRIPT");
+        vm.registerJavaMethod(repleteHighResTimer, "REPLETE_HIGH_RES_TIMER");
+        vm.registerJavaMethod(repleteSetTimeout, "setTimeout");
+        vm.registerJavaMethod(repleteCancelTimeout, "clearTimeout");
+
+        BootstrapTask(
+            vm,
+            adapter!!,
+            { isVMLoaded = true },
+            { s -> bundleGetContents(s) },
+            { f -> runOnUiThread(f) }).execute()
+    }
+}
+
+class ExecuteScriptTask(val vm: V8) : AsyncTask<String, Unit, Unit>() {
+    override fun onPreExecute() {
+        vm.locker.release()
+    }
+
+    override fun doInBackground(vararg params: String) {
+        vm.locker.acquire()
+        vm.executeScript(params[0])
+        vm.locker.release()
+    }
+
+    override fun onPostExecute(result: Unit?) {
+        vm.locker.acquire()
+    }
+}
+
+class BootstrapTask(
+    val vm: V8,
+    val adapter: HistoryAdapter,
+    val onVMLoaded: () -> Unit,
+    val bundleGetContents: (String) -> String,
+    val runOnUiThread: (Runnable) -> Unit
+) :
+    AsyncTask<Unit, Unit, Unit>() {
+    override fun onPreExecute() {
+        vm.locker.release()
+    }
+
+    override fun onPostExecute(result: Unit?) {
+        vm.locker.acquire()
+        onVMLoaded()
+    }
+
+    override fun doInBackground(vararg params: Unit?) {
+
+
+        try {
+
+            vm.locker.acquire()
+
+            val deps_file_path = "main.js"
+            val goog_base_path = "goog/base.js"
+
+            vm.executeScript("var global = this;")
+
+            vm.executeScript("CLOSURE_IMPORT_SCRIPT = function(src) { AMBLY_IMPORT_SCRIPT('goog/' + src); return true; }")
+
+            vm.executeScript(bundleGetContents(goog_base_path))
+            vm.executeScript(bundleGetContents(deps_file_path))
+
+
+            vm.executeScript("goog.isProvided_ = function(x) { return false; };")
+            vm.executeScript("goog.require = function (name) { return CLOSURE_IMPORT_SCRIPT(goog.dependencies_.nameToPath[name]); };")
+            vm.executeScript("goog.require('cljs.core');")
+            vm.executeScript(
+                "cljs.core._STAR_loaded_libs_STAR_ = cljs.core.into.call(null, cljs.core.PersistentHashSet.EMPTY, [\"cljs.core\"]);\n" +
+                        "goog.require = function (name, reload) {\n" +
+                        "    if(!cljs.core.contains_QMARK_(cljs.core._STAR_loaded_libs_STAR_, name) || reload) {\n" +
+                        "        var AMBLY_TMP = cljs.core.PersistentHashSet.EMPTY;\n" +
+                        "        if (cljs.core._STAR_loaded_libs_STAR_) {\n" +
+                        "            AMBLY_TMP = cljs.core._STAR_loaded_libs_STAR_;\n" +
+                        "        }\n" +
+                        "        cljs.core._STAR_loaded_libs_STAR_ = cljs.core.into.call(null, AMBLY_TMP, [name]);\n" +
+                        "        CLOSURE_IMPORT_SCRIPT(goog.dependencies_.nameToPath[name]);\n" +
+                        "    }\n" +
+                        "};"
+            )
+
+            vm.executeScript("goog.provide('cljs.user');")
+            vm.executeScript("goog.require('cljs.core');")
+            vm.executeScript("goog.require('replete.repl');")
+            vm.executeScript("replete.repl.setup_cljs_user();")
+            vm.executeScript("replete.repl.init_app_env({'debug-build': false, 'target-simulator': false, 'user-interface-idiom': 'iPhone'});")
+            vm.executeScript("cljs.core.system_time = REPLETE_HIGH_RES_TIMER;")
+            vm.executeScript("cljs.core.set_print_fn_BANG_.call(null, REPLETE_PRINT_FN);")
+            vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
+            vm.executeScript("var window = global;")
+
+            vm.locker.release()
+        } catch (e: Exception) {
+            if (vm.locker.hasLock()) {
+                vm.locker.release()
+            }
+            runOnUiThread(Runnable {
+                adapter.update(Item(e.toString(), ItemType.ERROR))
+            })
         }
     }
 }
