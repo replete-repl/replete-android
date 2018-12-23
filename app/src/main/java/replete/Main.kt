@@ -15,7 +15,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.AsyncTask
 import android.os.Handler
-import android.text.SpannableStringBuilder
 
 fun markString(s: String): String {
     // black
@@ -179,7 +178,7 @@ class MainActivity : AppCompatActivity() {
         val text = ret[0] as String
         val cursor = ret[1] as Int
 
-        inputField.text = SpannableStringBuilder(text)
+        s.replace(0, s.length, text)
         inputField.setSelection(cursor)
 
         params.release()
