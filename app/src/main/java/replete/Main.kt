@@ -446,14 +446,8 @@ class BootstrapTask(
             vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
             vm.executeScript("var window = global;")
 
-            val vars = vm.getObject("replete").getObject("repl").executeArrayFunction("all_vars", V8Array(vm))
-            val words = arrayListOf<String>()
+            val words = getAllVars()
 
-            for (idx in 0 until vars.length()) {
-                words.add(vars[idx] as String)
-            }
-
-            vars.release()
             vm.locker.release()
 
             return BootstrapTaskResult.Result(words)
@@ -463,6 +457,19 @@ class BootstrapTask(
             }
             return BootstrapTaskResult.Error(e)
         }
+    }
+
+    private fun getAllVars(): ArrayList<String> {
+//        val vars = vm.getObject("replete").getObject("repl").executeArrayFunction("all_vars", V8Array(vm))
+        val words = arrayListOf<String>()
+
+//        for (idx in 0 until vars.length()) {
+//            words.add(vars[idx] as String)
+//        }
+
+//        vars.release()
+
+        return words
     }
 
     override fun onPostExecute(result: BootstrapTaskResult) {
