@@ -15,7 +15,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.AsyncTask
 import android.os.Handler
+import android.provider.UserDictionary
 import java.net.URL
+import java.util.*
 
 fun markString(s: String): String {
     // black
@@ -207,6 +209,13 @@ class MainActivity : AppCompatActivity() {
         ret.release()
     }
 
+    @RequiresApi(Build.VERSION_CODES.JELLY_BEAN)
+    private fun addWords(words: ArrayList<String>) {
+        words.forEach { word ->
+            UserDictionary.Words.addWord(this, word, 255, null, Locale.getDefault())
+        }
+    }
+
     private var selectedPosition = -1
     private var selectedView: View? = null
 
@@ -353,7 +362,10 @@ class MainActivity : AppCompatActivity() {
         BootstrapTask(
             vm,
             adapter!!,
-            { isVMLoaded = true },
+            { result: BootstrapTaskResult.Result ->
+                isVMLoaded = true
+                addWords(result.words)
+            },
             { s -> bundleGetContents(s) }).execute()
     }
 }
@@ -374,19 +386,24 @@ class ExecuteScriptTask(val vm: V8) : AsyncTask<String, Unit, Unit>() {
     }
 }
 
+open class BootstrapTaskResult() {
+    class Error(val error: Exception) : BootstrapTaskResult()
+    class Result(val words: ArrayList<String>) : BootstrapTaskResult()
+}
+
 class BootstrapTask(
     val vm: V8,
     val adapter: HistoryAdapter,
-    val onVMLoaded: () -> Unit,
+    val onVMLoaded: (BootstrapTaskResult.Result) -> Unit,
     val bundleGetContents: (String) -> String
 ) :
-    AsyncTask<Unit, Unit, Exception?>() {
+    AsyncTask<Unit, Unit, BootstrapTaskResult>() {
 
     override fun onPreExecute() {
         vm.locker.release()
     }
 
-    override fun doInBackground(vararg params: Unit?): Exception? {
+    override fun doInBackground(vararg params: Unit?): BootstrapTaskResult {
 
         try {
 
@@ -401,7 +418,6 @@ class BootstrapTask(
 
             vm.executeScript(bundleGetContents(goog_base_path))
             vm.executeScript(bundleGetContents(deps_file_path))
-
 
             vm.executeScript("goog.isProvided_ = function(x) { return false; };")
             vm.executeScript("goog.require = function (name) { return CLOSURE_IMPORT_SCRIPT(goog.dependencies_.nameToPath[name]); };")
@@ -430,22 +446,30 @@ class BootstrapTask(
             vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
             vm.executeScript("var window = global;")
 
+            val vars = vm.getObject("replete").getObject("repl").executeArrayFunction("all_vars", V8Array(vm))
+            val words = arrayListOf<String>()
+
+            for (idx in 0 until vars.length()) {
+                words.add(vars[idx] as String)
+            }
+
+            vars.release()
             vm.locker.release()
 
-            return null
+            return BootstrapTaskResult.Result(words)
         } catch (e: Exception) {
             if (vm.locker.hasLock()) {
                 vm.locker.release()
             }
-            return e
+            return BootstrapTaskResult.Error(e)
         }
     }
 
-    override fun onPostExecute(error: Exception?) {
+    override fun onPostExecute(result: BootstrapTaskResult) {
         vm.locker.acquire()
-        if (error != null) {
-            adapter.update(Item(error.toString(), ItemType.ERROR))
+        when (result) {
+            is BootstrapTaskResult.Error -> adapter.update(Item(result.error.toString(), ItemType.ERROR))
+            is BootstrapTaskResult.Result -> onVMLoaded(result)
         }
-        onVMLoaded()
     }
 }
