@@ -15,6 +15,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.AsyncTask
 import android.os.Handler
+import java.net.URL
 
 fun markString(s: String): String {
     // black
@@ -103,6 +104,27 @@ class MainActivity : AppCompatActivity() {
 
     private val repleteHighResTimer = JavaCallback { receiver, parameters ->
         System.nanoTime() / 1e6
+    }
+
+    private val repleteRequest = JavaCallback { receiver, parameters ->
+        if (parameters.length() > 0) {
+            val arg1 = parameters.get(0)
+            val arg2 = parameters.get(1)
+
+            val ret = URL(arg1.toString()).readText()
+
+            if (arg1 is Releasable) {
+                arg1.release()
+            }
+
+            if (arg2 is Releasable) {
+                arg2.release()
+            }
+
+            return@JavaCallback ret
+        } else {
+
+        }
     }
 
     private val repleteLoad = JavaCallback { receiver, parameters ->
@@ -324,6 +346,7 @@ class MainActivity : AppCompatActivity() {
         vm.registerJavaMethod(repletePrintFn, "REPLETE_PRINT_FN");
         vm.registerJavaMethod(amblyImportScript, "AMBLY_IMPORT_SCRIPT");
         vm.registerJavaMethod(repleteHighResTimer, "REPLETE_HIGH_RES_TIMER");
+        vm.registerJavaMethod(repleteRequest, "REPLETE_REQUEST");
         vm.registerJavaMethod(repleteSetTimeout, "setTimeout");
         vm.registerJavaMethod(repleteCancelTimeout, "clearTimeout");
 
