@@ -1,5 +1,6 @@
 package replete
 
+import android.annotation.TargetApi
 import android.content.Context
 import android.graphics.Color
 import android.os.Build
@@ -16,7 +17,14 @@ import android.content.ClipboardManager
 import android.os.AsyncTask
 import android.os.Handler
 import android.provider.UserDictionary
+import java.io.*
+import java.lang.StringBuilder
+import java.net.HttpURLConnection
 import java.net.URL
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.*
 
 fun markString(s: String): String {
@@ -31,6 +39,7 @@ fun markString(s: String): String {
     return s.replace(Regex("\\u001B\\[(34|32|35|31|30)m"), "")
 }
 
+@TargetApi(Build.VERSION_CODES.O)
 class MainActivity : AppCompatActivity() {
 
     private val vm: V8 = V8.createV8Runtime()
@@ -91,7 +100,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val repleteCancelTimeout = JavaVoidCallback { receiver, parameters ->
+    private val repleteCancelTimeout = JavaCallback { receiver, parameters ->
         if (parameters.length() > 0) {
             val arg1 = parameters.get(0)
 
@@ -102,6 +111,7 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
         }
+        return@JavaCallback V8.getUndefined()
     }
 
     private val repleteHighResTimer = JavaCallback { receiver, parameters ->
@@ -109,21 +119,132 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val repleteRequest = JavaCallback { receiver, parameters ->
-        if (parameters.length() > 0) {
-            val arg1 = parameters.get(0)
-            val arg2 = parameters.get(1)
+        if (parameters.length() > 0 && parameters.get(0) is V8Object) {
+            val opts = parameters.get(0) as V8Object
 
-            val ret = URL(arg1.toString()).readText()
-
-            if (arg1 is Releasable) {
-                arg1.release()
+            val url = try {
+                URL(opts.getString("url"))
+            } catch (e: V8ResultUndefined) {
+                null
             }
 
-            if (arg2 is Releasable) {
-                arg2.release()
+            val timeout = try {
+                opts.getInteger("timeout") * 1000
+            } catch (e: V8ResultUndefined) {
+                0
             }
 
-            return@JavaCallback ret
+            val binaryResponse = try {
+                opts.getBoolean("binary-response")
+            } catch (e: V8ResultUndefined) {
+                false
+            }
+
+            val method = try {
+                opts.getString("method")
+            } catch (e: V8ResultUndefined) {
+                "GET"
+            }
+
+            val body = try {
+                opts.getString("body")
+            } catch (e: V8ResultUndefined) {
+                null
+            }
+
+            val headers = try {
+                opts.getObject("headers")
+            } catch (e: V8ResultUndefined) {
+                null
+            }
+
+            val userAgent = try {
+                opts.getString("user-agent")
+            } catch (e: V8ResultUndefined) {
+                null
+            }
+
+            val insecure = try {
+                opts.getBoolean("insecure")
+            } catch (e: V8ResultUndefined) {
+                false
+            }
+
+            val socket = try {
+                opts.getString("socket")
+            } catch (e: V8ResultUndefined) {
+                null
+            }
+
+            opts.release()
+
+            if (url != null) {
+                val conn = url.openConnection() as HttpURLConnection
+
+                conn.allowUserInteraction = false
+                conn.requestMethod = method
+                conn.readTimeout = timeout
+                conn.connectTimeout = timeout
+
+                if (userAgent != null) {
+                    conn.setRequestProperty("User-Agent", userAgent)
+                }
+
+                if (headers != null) {
+                    for (key in headers.keys) {
+                        val value = headers.getString(key)
+                        conn.setRequestProperty(key, value)
+                    }
+                }
+
+                if (body != null) {
+                    val ba = body.toByteArray()
+                    conn.setRequestProperty("Content-Length", ba.size.toString())
+                    conn.doInput = true;
+                    conn.doOutput = true;
+                    conn.useCaches = false;
+
+                    val os = conn.outputStream
+                    os.write(body.toByteArray())
+                    os.close()
+                }
+
+                try {
+                    conn.connect()
+
+                    val result = V8Object(vm)
+
+                    val responseBytes = conn.inputStream.readBytes()
+                    val responseCode = conn.responseCode
+                    val responseHeaders = V8Object(vm)
+
+                    for (entry in conn.headerFields.entries) {
+                        val values = StringBuilder()
+                        for (value in entry.value) {
+                            values.append(value, ",")
+                        }
+                        if (entry.key != null) {
+                            responseHeaders.add(entry.key, values.toString())
+                        }
+                    }
+
+                    result.add("status", responseCode)
+                    result.add("headers", responseHeaders)
+
+                    if (binaryResponse) {
+                        result.add("body", V8ArrayBuffer(vm, ByteBuffer.wrap(responseBytes)))
+                    } else {
+                        result.add("body", String(responseBytes))
+                    }
+
+                    return@JavaCallback result
+                } catch (e: Exception) {
+                    val result = V8Object(vm)
+                    result.add("error", e.message)
+                    return@JavaCallback result
+                }
+            } else {
+            }
         } else {
 
         }
@@ -146,7 +267,7 @@ class MainActivity : AppCompatActivity() {
 
     private val loadedLibs = mutableSetOf<String>()
 
-    private val amblyImportScript = JavaVoidCallback { receiver, parameters ->
+    private val amblyImportScript = JavaCallback { receiver, parameters ->
         if (parameters.length() > 0) {
             val arg = parameters.get(0)
             var path = arg.toString()
@@ -159,7 +280,6 @@ class MainActivity : AppCompatActivity() {
                     path = path.substring(8, path.length)
                 }
 
-
                 vm.executeScript(bundleGetContents(path))
             }
 
@@ -167,9 +287,10 @@ class MainActivity : AppCompatActivity() {
                 arg.release()
             }
         }
+        return@JavaCallback V8.getUndefined()
     }
 
-    private val repletePrintFn = JavaVoidCallback { receiver, parameters ->
+    private val repletePrintFn = JavaCallback { receiver, parameters ->
         if (parameters.length() > 0) {
             val msg = parameters.get(0)
 
@@ -181,6 +302,7 @@ class MainActivity : AppCompatActivity() {
                 msg.release()
             }
         }
+        return@JavaCallback V8.getUndefined()
     }
 
     private fun runPoorMansParinfer(inputField: EditText, s: Editable) {
@@ -209,17 +331,71 @@ class MainActivity : AppCompatActivity() {
         ret.release()
     }
 
-    @RequiresApi(Build.VERSION_CODES.JELLY_BEAN)
     private fun addWords(words: ArrayList<String>) {
         words.forEach { word ->
             UserDictionary.Words.addWord(this, word, 255, null, Locale.getDefault())
         }
     }
 
+    private val repleteWriteStdout = JavaCallback { receiver, params ->
+        if (params.length() > 0) {
+            val s = params.get(0)
+            System.out.printf(s.toString())
+            if (s is Releasable) {
+                s.release()
+            }
+        }
+        return@JavaCallback V8.getUndefined()
+    }
+
+    private val repleteFlushStdout = JavaCallback { receiver, params ->
+        System.out.flush()
+        return@JavaCallback V8.getUndefined()
+    }
+
+    private val repleteWriteStderr = JavaCallback { receiver, params ->
+        if (params.length() > 0) {
+            val s = params.get(0)
+            System.err.printf(s.toString())
+            if (s is Releasable) {
+                s.release()
+            }
+        }
+        return@JavaCallback V8.getUndefined()
+    }
+
+    private val repleteFlushStderr = JavaCallback { receiver, params ->
+        System.err.flush()
+        return@JavaCallback V8.getUndefined()
+    }
+
+    private val repleteIsDirectory = JavaCallback { receiver, params ->
+        if (params.length() > 0) {
+            val path = params.get(0) as V8Value
+            val ret = Files.isDirectory(Paths.get(path.toString()))
+            path.release()
+            return@JavaCallback ret
+        } else {
+        }
+    }
+
+    private val repleteListFiles = JavaCallback { receiver, params ->
+        if (params.length() > 0) {
+            val path = params.get(0) as V8Value
+            val ret = V8Array(vm)
+
+            Files.list(Paths.get(path.toString())).forEach { p -> ret.push(p.toString()) }
+
+            path.release()
+
+            return@JavaCallback ret
+        } else {
+        }
+    }
+
     private var selectedPosition = -1
     private var selectedView: View? = null
 
-    @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -356,6 +532,12 @@ class MainActivity : AppCompatActivity() {
         vm.registerJavaMethod(amblyImportScript, "AMBLY_IMPORT_SCRIPT");
         vm.registerJavaMethod(repleteHighResTimer, "REPLETE_HIGH_RES_TIMER");
         vm.registerJavaMethod(repleteRequest, "REPLETE_REQUEST");
+        vm.registerJavaMethod(repleteWriteStdout, "REPLETE_RAW_WRITE_STDOUT");
+        vm.registerJavaMethod(repleteFlushStdout, "REPLETE_RAW_FLUSH_STDOUT");
+        vm.registerJavaMethod(repleteWriteStderr, "REPLETE_RAW_WRITE_STDERR");
+        vm.registerJavaMethod(repleteFlushStderr, "REPLETE_RAW_FLUSH_STDERR");
+        vm.registerJavaMethod(repleteIsDirectory, "REPLETE_IS_DIRECTORY");
+        vm.registerJavaMethod(repleteListFiles, "REPLETE_LIST_FILES");
         vm.registerJavaMethod(repleteSetTimeout, "setTimeout");
         vm.registerJavaMethod(repleteCancelTimeout, "clearTimeout");
 
@@ -387,7 +569,7 @@ class ExecuteScriptTask(val vm: V8) : AsyncTask<String, Unit, Unit>() {
 }
 
 open class BootstrapTaskResult() {
-    class Error(val error: Exception) : BootstrapTaskResult()
+    class Error(val error: V8ScriptExecutionException) : BootstrapTaskResult()
     class Result(val words: ArrayList<String>) : BootstrapTaskResult()
 }
 
@@ -439,6 +621,7 @@ class BootstrapTask(
             vm.executeScript("goog.provide('cljs.user');")
             vm.executeScript("goog.require('cljs.core');")
             vm.executeScript("goog.require('replete.repl');")
+            vm.executeScript("goog.require('replete.core');")
             vm.executeScript("replete.repl.setup_cljs_user();")
             vm.executeScript("replete.repl.init_app_env({'debug-build': false, 'target-simulator': false, 'user-interface-idiom': 'iPhone'});")
             vm.executeScript("cljs.core.system_time = REPLETE_HIGH_RES_TIMER;")
@@ -451,7 +634,7 @@ class BootstrapTask(
             vm.locker.release()
 
             return BootstrapTaskResult.Result(words)
-        } catch (e: Exception) {
+        } catch (e: V8ScriptExecutionException) {
             if (vm.locker.hasLock()) {
                 vm.locker.release()
             }
@@ -472,10 +655,16 @@ class BootstrapTask(
         return words
     }
 
+    @TargetApi(Build.VERSION_CODES.KITKAT)
+    @RequiresApi(Build.VERSION_CODES.KITKAT)
     override fun onPostExecute(result: BootstrapTaskResult) {
         vm.locker.acquire()
         when (result) {
-            is BootstrapTaskResult.Error -> adapter.update(Item(result.error.toString(), ItemType.ERROR))
+            is BootstrapTaskResult.Error -> {
+                val baos = ByteArrayOutputStream()
+                result.error.printStackTrace(PrintStream(baos, true, "UTF-8"))
+                adapter.update(Item(String(baos.toByteArray(), UTF_8), ItemType.ERROR))
+            }
             is BootstrapTaskResult.Result -> onVMLoaded(result)
         }
     }
