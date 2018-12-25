@@ -86,7 +86,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var timeoutId: Long = 0
-    private val timeouts: MutableMap<Long, Runnable> = mutableMapOf()
+    private val timeouts: MutableMap<Long, TimeoutThread> = mutableMapOf()
+
+    class TimeoutThread(val callback: () -> Unit, val t: Long) : Thread() {
+        var isTimeoutCanceled = false
+        override fun run() {
+            Thread.sleep(t)
+            if (!isTimeoutCanceled) {
+                callback()
+            }
+        }
+    }
 
     private fun setTimeout(callback: () -> Unit, t: Long): Long {
 
@@ -96,50 +106,40 @@ class MainActivity : AppCompatActivity() {
             ++timeoutId;
         }
 
-        val runnable = Runnable { callback() }
-        timeouts.set(timeoutId, runnable)
-        Handler().postDelayed(runnable, t)
+        val tt = TimeoutThread({ runOnUiThread { callback() } }, t)
+        timeouts[timeoutId] = tt
+
+        tt.start()
 
         return timeoutId
     }
 
     private fun cancelTimeout(tid: Long) {
         if (timeouts.contains(tid)) {
-            Handler().removeCallbacks(timeouts.get(tid))
+            timeouts[tid]!!.isTimeoutCanceled = true
             timeouts.remove(tid)
         }
     }
 
     private val repleteSetTimeout = JavaCallback { receiver, parameters ->
-        if (parameters.length() > 0) {
-            val arg1 = parameters.get(0)
-            val arg2 = parameters.get(1)
-
+        if (parameters.length() == 2) {
+            val callback = parameters.get(0) as V8Function
+            val timeout = parameters.getDouble(1).toLong()
             val tid = setTimeout(fun() {
-                val callback = arg1 as V8Function
                 callback.call(callback, V8Array(vm))
-                arg1.release()
-                if (arg2 is Releasable) {
-                    arg2.release()
-                }
-            }, arg2 as Long or 4)
+                callback.release()
+            }, timeout)
 
-            return@JavaCallback tid
+            return@JavaCallback tid.toDouble()
         } else {
             return@JavaCallback V8.getUndefined()
         }
     }
 
     private val repleteCancelTimeout = JavaCallback { receiver, parameters ->
-        if (parameters.length() > 0) {
-            val arg1 = parameters.get(0)
-
-            cancelTimeout(arg1 as Long)
-
-            if (arg1 is Releasable) {
-                arg1.release()
-            }
-        } else {
+        if (parameters.length() == 1) {
+            val tid = parameters.getInteger(0).toLong()
+            cancelTimeout(tid)
         }
         return@JavaCallback V8.getUndefined()
     }
