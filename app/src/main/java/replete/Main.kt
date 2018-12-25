@@ -14,6 +14,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.*
 import android.provider.UserDictionary
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
 import java.io.*
 import java.lang.StringBuilder
 import java.net.HttpURLConnection
@@ -24,16 +27,45 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
 
-fun markString(s: String): String {
-    // black
-    // 34 blue
-    // 32 red: 0.0, green: 0.75, blue: 0.0
-    // 35 red: 0.75, green: 0.0, blue: 0.75
-    // 31 red: 1, green: 0.33, blue: 0.33
-    // 30 reset
+fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
+    return s.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
+}
 
+@TargetApi(Build.VERSION_CODES.O)
+@RequiresApi(Build.VERSION_CODES.O)
+fun markString(s: String): SpannableString {
 
-    return s.replace(Regex("\\u001B\\[(34|32|35|31|30)m"), "")
+    var idx = 0
+    var rs = s as CharSequence
+    var ps = mutableListOf<Int>()
+
+    while (idx != -1) {
+        idx = rs.indexOfFirst { c -> c == "\u001B"[0] }
+        if (idx != -1) {
+            val color = when (rs.substring(idx + 2, idx + 4).toInt()) {
+                34 -> Color.BLUE
+                32 -> Color.rgb(0f, 0.75f, 0f)
+                35 -> Color.rgb(0.75f, 0f, 0.75f)
+                31 -> Color.rgb(1f, 0.33f, 0.33f)
+                else -> null
+            }
+            rs = rs.substring(0, idx).plus(rs.substring(idx + 5, rs.length))
+
+            if (color != null) {
+                ps.add(color)
+            }
+            ps.add(idx)
+        }
+    }
+
+    val srs = SpannableString(rs)
+
+    while (ps.isNotEmpty()) {
+        setTextSpanColor(srs, ps[0], ps[1], ps[2])
+        ps = ps.subList(3, ps.size)
+    }
+
+    return srs
 }
 
 @TargetApi(Build.VERSION_CODES.O)
@@ -617,24 +649,27 @@ class MainActivity : AppCompatActivity() {
         evalButton.setOnClickListener { v ->
             val input = inputField.text.toString()
             inputField.text.clear()
-            adapter!!.update(Item(input, ItemType.INPUT))
+            adapter!!.update(Item(SpannableString(input), ItemType.INPUT))
 
             try {
                 ExecuteScriptTask(vm).execute("""replete.repl.read_eval_print(`${input.replace("\"", "\\\"")}`);""")
             } catch (e: Exception) {
-                adapter!!.update(Item(e.toString(), ItemType.ERROR))
+                adapter!!.update(Item(SpannableString(e.toString()), ItemType.ERROR))
             }
 
         }
 
         adapter!!.update(
             Item(
-                "\nClojureScript ${getClojureScriptVersion()}\n" +
-                        "    Docs: (doc function-name)\n" +
-                        "          (find-doc \"part-of-name\")\n" +
-                        "  Source: (source function-name)\n" +
-                        " Results: Stored in *1, *2, *3,\n" +
-                        "          an exception in *e\n", ItemType.INPUT
+                SpannableString(
+                    "\nClojureScript ${getClojureScriptVersion()}\n" +
+                            "    Docs: (doc function-name)\n" +
+                            "          (find-doc \"part-of-name\")\n" +
+                            "  Source: (source function-name)\n" +
+                            " Results: Stored in *1, *2, *3,\n" +
+                            "          an exception in *e\n"
+                )
+                , ItemType.INPUT
             )
         )
 
@@ -787,7 +822,7 @@ class BootstrapTask(
             is BootstrapTaskResult.Error -> {
                 val baos = ByteArrayOutputStream()
                 result.error.printStackTrace(PrintStream(baos, true, "UTF-8"))
-                adapter.update(Item(String(baos.toByteArray(), UTF_8), ItemType.ERROR))
+                adapter.update(Item(SpannableString(String(baos.toByteArray(), UTF_8)), ItemType.ERROR))
             }
             is BootstrapTaskResult.Result -> onVMLoaded(result)
         }

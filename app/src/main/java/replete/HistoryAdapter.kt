@@ -2,6 +2,7 @@ package replete
 
 import android.content.Context
 import android.graphics.Color
+import android.text.SpannableString
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,7 +14,7 @@ enum class ItemType {
     INPUT, OUTPUT, ERROR
 }
 
-data class Item(val text: String, val type: ItemType)
+data class Item(val text: SpannableString, val type: ItemType)
 
 fun inflateItem(viewHolder: HistoryAdapter.ViewHolder, item: Item) {
     viewHolder.item.text = item.text
