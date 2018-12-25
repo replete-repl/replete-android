@@ -85,6 +85,69 @@ class MainActivity : AppCompatActivity() {
         return s.substring(29, s.length).takeWhile { c -> c != " ".toCharArray()[0] }
     }
 
+    private var intervalId: Long = 0
+    private val intervals: MutableMap<Long, IntervalThread> = mutableMapOf()
+
+    class IntervalThread(val callback: () -> Unit, val onCanceled: () -> Unit, val t: Long) : Thread() {
+        var isIntervalCanceled = false
+        override fun run() {
+            while (true) {
+                Thread.sleep(t)
+                if (isIntervalCanceled) {
+                    onCanceled()
+                    break
+                } else {
+                    callback()
+                }
+            }
+        }
+    }
+
+    private fun setInterval(callback: () -> Unit, onCanceled: () -> Unit, t: Long): Long {
+
+        if (intervalId == 9007199254740991) {
+            intervalId = 0;
+        } else {
+            ++intervalId;
+        }
+
+        val tt = IntervalThread({ runOnUiThread { callback() } }, { runOnUiThread { onCanceled() } }, t)
+        intervals[intervalId] = tt
+
+        tt.start()
+
+        return intervalId
+    }
+
+    private fun cancelInterval(tid: Long) {
+        if (intervals.contains(tid)) {
+            intervals[tid]!!.isIntervalCanceled = true
+            intervals.remove(tid)
+        }
+    }
+
+    private val repleteSetInterval = JavaCallback { receiver, parameters ->
+        if (parameters.length() == 2) {
+            val callback = parameters.get(0) as V8Function
+            val timeout = parameters.getDouble(1).toLong()
+            val tid = setInterval(fun() {
+                callback.call(callback, V8Array(vm))
+            }, { callback.release() }, timeout)
+
+            return@JavaCallback tid.toDouble()
+        } else {
+            return@JavaCallback V8.getUndefined()
+        }
+    }
+
+    private val repleteCancelInterval = JavaCallback { receiver, parameters ->
+        if (parameters.length() == 1) {
+            val tid = parameters.getInteger(0).toLong()
+            cancelInterval(tid)
+        }
+        return@JavaCallback V8.getUndefined()
+    }
+
     private var timeoutId: Long = 0
     private val timeouts: MutableMap<Long, TimeoutThread> = mutableMapOf()
 
@@ -699,6 +762,9 @@ class MainActivity : AppCompatActivity() {
 
         vm.registerJavaMethod(repleteSetTimeout, "setTimeout");
         vm.registerJavaMethod(repleteCancelTimeout, "clearTimeout");
+
+        vm.registerJavaMethod(repleteSetInterval, "setInterval");
+        vm.registerJavaMethod(repleteCancelInterval, "clearInterval");
 
         BootstrapTask(
             vm,
