@@ -58,7 +58,7 @@ fun markString(s: String): SpannableString {
 
     val srs = SpannableString(rs)
 
-    while (srs.isNotEmpty() && ps.isNotEmpty()) {
+    while (srs.isNotEmpty() && ps.size >= 3) {
         setTextSpanColor(srs, ps[0], ps[1], ps[2])
         ps = ps.subList(3, ps.size)
     }
