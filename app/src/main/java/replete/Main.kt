@@ -31,8 +31,6 @@ fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
     return s.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
 }
 
-@TargetApi(Build.VERSION_CODES.O)
-@RequiresApi(Build.VERSION_CODES.O)
 fun markString(s: String): SpannableString {
 
     var idx = 0
@@ -44,9 +42,9 @@ fun markString(s: String): SpannableString {
         if (idx != -1) {
             val color = when (rs.substring(idx + 2, idx + 4).toInt()) {
                 34 -> Color.BLUE
-                32 -> Color.rgb(0f, 0.75f, 0f)
-                35 -> Color.rgb(0.75f, 0f, 0.75f)
-                31 -> Color.rgb(1f, 0.33f, 0.33f)
+                32 -> Color.rgb(0, 191, 0)
+                35 -> Color.rgb(191, 0, 191)
+                31 -> Color.rgb(255, 84, 84)
                 else -> null
             }
             rs = rs.substring(0, idx).plus(rs.substring(idx + 5, rs.length))
