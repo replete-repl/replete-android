@@ -3,9 +3,7 @@ package replete
 import android.annotation.TargetApi
 import android.content.Context
 import android.graphics.Color
-import android.os.Build
 import android.support.v7.app.AppCompatActivity
-import android.os.Bundle
 import android.support.annotation.RequiresApi
 import android.text.Editable
 import android.text.TextWatcher
@@ -14,8 +12,7 @@ import android.widget.*
 import com.eclipsesource.v8.*
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.os.AsyncTask
-import android.os.Handler
+import android.os.*
 import android.provider.UserDictionary
 import java.io.*
 import java.lang.StringBuilder
@@ -97,6 +94,7 @@ class MainActivity : AppCompatActivity() {
 
             return@JavaCallback tid
         } else {
+            return@JavaCallback V8.getUndefined()
         }
     }
 
@@ -244,9 +242,10 @@ class MainActivity : AppCompatActivity() {
                     return@JavaCallback result
                 }
             } else {
+                return@JavaCallback V8.getUndefined()
             }
         } else {
-
+            return@JavaCallback V8.getUndefined()
         }
     }
 
@@ -261,7 +260,7 @@ class MainActivity : AppCompatActivity() {
 
             return@JavaCallback bundleGetContents(path)
         } else {
-
+            return@JavaCallback V8.getUndefined()
         }
     }
 
@@ -376,6 +375,7 @@ class MainActivity : AppCompatActivity() {
             path.release()
             return@JavaCallback ret
         } else {
+            return@JavaCallback V8.getUndefined()
         }
     }
 
@@ -390,6 +390,117 @@ class MainActivity : AppCompatActivity() {
 
             return@JavaCallback ret
         } else {
+            return@JavaCallback V8.getUndefined()
+        }
+    }
+
+    private val openWriteFiles = mutableMapOf<String, OutputStreamWriter>()
+
+    private val repleteFileWriterOpen = JavaCallback { receiver, params ->
+        if (params.length() == 3) {
+            val path = params.getString(0)
+            val append = params.getBoolean(1)
+            val encoding = params.getString(2)
+            val out =
+                openFileOutput(path, if (append) Context.MODE_APPEND else Context.MODE_PRIVATE).writer(Charsets.UTF_8)
+
+            openWriteFiles[path] = out
+
+            return@JavaCallback path
+        } else {
+            return@JavaCallback "0"
+        }
+    }
+
+    private val repleteFileWriterWrite = JavaCallback { receiver, params ->
+        if (params.length() == 2) {
+            val path = params.getString(0)
+            val content = params.getString(1)
+
+            try {
+                openWriteFiles[path]!!.write(content)
+            } catch (e: Exception) {
+                return@JavaCallback e.message
+            }
+            return@JavaCallback V8.getUndefined()
+        } else {
+            return@JavaCallback "This functions accepts 2 arguments"
+        }
+    }
+
+    private val repleteFileWriterFlush = JavaCallback { receiver, params ->
+        if (params.length() == 1) {
+            val path = params.getString(0)
+
+            try {
+                openWriteFiles[path]!!.flush()
+            } catch (e: Exception) {
+                return@JavaCallback e.message
+            }
+            return@JavaCallback V8.getUndefined()
+        } else {
+            return@JavaCallback "This functions accepts 1 argument"
+        }
+    }
+
+    private val repleteFileWriterClose = JavaCallback { receiver, params ->
+        if (params.length() == 1) {
+            val path = params.getString(0)
+
+            try {
+                openWriteFiles[path]!!.close()
+                openWriteFiles.remove(path)
+            } catch (e: Exception) {
+                return@JavaCallback e.message
+            }
+
+            return@JavaCallback V8.getUndefined()
+        } else {
+            return@JavaCallback "This functions accepts 1 argument"
+        }
+    }
+
+    private val openReadFiles = mutableMapOf<String, InputStreamReader>()
+
+    private val repleteFileReaderOpen = JavaCallback { receiver, params ->
+        if (params.length() == 2) {
+            val path = params.getString(0)
+            val encoding = params.getString(1)
+            val out = openFileInput(path).reader(Charsets.UTF_8)
+
+            openReadFiles[path] = out
+
+            return@JavaCallback path
+        } else {
+            return@JavaCallback "0"
+        }
+    }
+
+    private val repleteFileReaderRead = JavaCallback { receiver, params ->
+        if (params.length() == 1) {
+            val path = params.getString(0)
+            val content = openReadFiles[path]!!.read()
+
+            if (content == -1) {
+                return@JavaCallback V8Array(vm).push(V8.getUndefined()).push(V8.getUndefined())
+            } else {
+                return@JavaCallback V8Array(vm).push(content.toChar().toString()).push(V8.getUndefined())
+            }
+        } else {
+            return@JavaCallback V8.getUndefined()
+        }
+    }
+
+    private val repleteFileReaderClose = JavaCallback { receiver, params ->
+        if (params.length() == 1) {
+            val path = params.getString(0)
+
+            openReadFiles[path]!!.close()
+            openReadFiles.remove(path)
+
+            return@JavaCallback V8.getUndefined()
+        } else {
+            return@JavaCallback V8.getUndefined()
         }
     }
 
@@ -532,12 +643,25 @@ class MainActivity : AppCompatActivity() {
         vm.registerJavaMethod(amblyImportScript, "AMBLY_IMPORT_SCRIPT");
         vm.registerJavaMethod(repleteHighResTimer, "REPLETE_HIGH_RES_TIMER");
         vm.registerJavaMethod(repleteRequest, "REPLETE_REQUEST");
+
         vm.registerJavaMethod(repleteWriteStdout, "REPLETE_RAW_WRITE_STDOUT");
         vm.registerJavaMethod(repleteFlushStdout, "REPLETE_RAW_FLUSH_STDOUT");
+
         vm.registerJavaMethod(repleteWriteStderr, "REPLETE_RAW_WRITE_STDERR");
         vm.registerJavaMethod(repleteFlushStderr, "REPLETE_RAW_FLUSH_STDERR");
+
         vm.registerJavaMethod(repleteIsDirectory, "REPLETE_IS_DIRECTORY");
         vm.registerJavaMethod(repleteListFiles, "REPLETE_LIST_FILES");
+
+        vm.registerJavaMethod(repleteFileReaderOpen, "REPLETE_FILE_READER_OPEN");
+        vm.registerJavaMethod(repleteFileReaderRead, "REPLETE_FILE_READER_READ");
+        vm.registerJavaMethod(repleteFileReaderClose, "REPLETE_FILE_READER_CLOSE");
+
+        vm.registerJavaMethod(repleteFileWriterOpen, "REPLETE_FILE_WRITER_OPEN");
+        vm.registerJavaMethod(repleteFileWriterWrite, "REPLETE_FILE_WRITER_WRITE");
+        vm.registerJavaMethod(repleteFileWriterFlush, "REPLETE_FILE_WRITER_FLUSH");
+        vm.registerJavaMethod(repleteFileWriterClose, "REPLETE_FILE_WRITER_CLOSE");
+
         vm.registerJavaMethod(repleteSetTimeout, "setTimeout");
         vm.registerJavaMethod(repleteCancelTimeout, "clearTimeout");
 
@@ -546,7 +670,7 @@ class MainActivity : AppCompatActivity() {
             adapter!!,
             { result: BootstrapTaskResult.Result ->
                 isVMLoaded = true
-                addWords(result.words)
+//                addWords(result.words)
             },
             { s -> bundleGetContents(s) }).execute()
     }
