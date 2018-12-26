@@ -19,6 +19,7 @@ import android.provider.UserDictionary
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
+import android.util.DisplayMetrics
 import java.io.*
 import java.lang.StringBuilder
 import java.net.HttpURLConnection
@@ -665,6 +666,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var deviceType: String? = null
+
+    private fun setDeviceType() {
+        val metrics = DisplayMetrics()
+        windowManager.defaultDisplay.getMetrics(metrics)
+
+        val yInches = metrics.heightPixels / metrics.ydpi;
+        val xInches = metrics.widthPixels / metrics.xdpi;
+        val diagonalInches = Math.sqrt((xInches * xInches + yInches * yInches).toDouble());
+        deviceType = if (diagonalInches >= 6.5) {
+            "iPad"
+        } else {
+            "iPhone"
+        }
+    }
+
     override fun onConfigurationChanged(cfg: Configuration) {
         if (resources.configuration.orientation != cfg.orientation) {
             updateWidth()
@@ -673,6 +690,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        setDeviceType()
 
         setContentView(R.layout.activity_main)
 
@@ -847,7 +866,7 @@ class MainActivity : AppCompatActivity() {
                 updateWidth()
 //                addWords(result.words)
             },
-            { s -> bundleGetContents(s) }).execute()
+            { s -> bundleGetContents(s) }).execute(deviceType)
     }
 }
 
@@ -878,13 +897,13 @@ class BootstrapTask(
     val onVMLoaded: (BootstrapTaskResult.Result) -> Unit,
     val bundleGetContents: (String) -> String
 ) :
-    AsyncTask<Unit, Unit, BootstrapTaskResult>() {
+    AsyncTask<String, Unit, BootstrapTaskResult>() {
 
     override fun onPreExecute() {
         vm.locker.release()
     }
 
-    override fun doInBackground(vararg params: Unit?): BootstrapTaskResult {
+    override fun doInBackground(vararg params: String?): BootstrapTaskResult {
 
         try {
 
@@ -922,7 +941,7 @@ class BootstrapTask(
             vm.executeScript("goog.require('replete.repl');")
             vm.executeScript("goog.require('replete.core');")
             vm.executeScript("replete.repl.setup_cljs_user();")
-            vm.executeScript("replete.repl.init_app_env({'debug-build': false, 'target-simulator': false, 'user-interface-idiom': 'iPhone'});")
+            vm.executeScript("replete.repl.init_app_env({'debug-build': false, 'target-simulator': false, 'user-interface-idiom': '${params[0]}'});")
             vm.executeScript("cljs.core.system_time = REPLETE_HIGH_RES_TIMER;")
             vm.executeScript("cljs.core.set_print_fn_BANG_.call(null, REPLETE_PRINT_FN);")
             vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
