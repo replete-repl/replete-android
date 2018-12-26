@@ -1,6 +1,7 @@
 package replete
 
 import android.annotation.TargetApi
+import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Color
 import android.support.v7.app.AppCompatActivity
@@ -386,8 +387,10 @@ class MainActivity : AppCompatActivity() {
         if (parameters.length() > 0) {
             val msg = parameters.get(0)
 
-            runOnUiThread {
-                adapter!!.update(Item(markString(msg.toString()), ItemType.OUTPUT))
+            if (!suppressPrinting) {
+                runOnUiThread {
+                    adapter!!.update(Item(markString(msg.toString()), ItemType.OUTPUT))
+                }
             }
 
             if (msg is Releasable) {
@@ -600,6 +603,59 @@ class MainActivity : AppCompatActivity() {
     private var selectedPosition = -1
     private var selectedView: View? = null
 
+    private fun isMacro(s: String): Boolean {
+        val _s = s.trimStart()
+        return _s.startsWith("(defmacro") || _s.startsWith("(defmacfn")
+    }
+
+    private fun chivorcamReferred(): Boolean {
+        return vm.getObject("replete").getObject("repl").executeBooleanFunction("chivorcam_referred", V8Array(vm))
+    }
+
+    private var consentedToChivorcam = false
+    private var suppressPrinting = false
+
+    private fun defmacroCalled(s: String) {
+        if (consentedToChivorcam) {
+            suppressPrinting = true
+            eval("(require '[chivorcam.core :refer [defmacro defmacfn]])", true)
+            suppressPrinting = false
+            eval(s, true)
+        } else {
+            val builder = AlertDialog.Builder(this)
+            builder.setTitle("Enable REPL\nMacro Definitions?")
+            builder.setMessage(
+                "ClojureScript macros must be defined in a separate namespace and required appropriately." +
+                        "\n\nFor didactic purposes, we can support defining macros directly in the Replete REPL. " +
+                        "\n\nAny helper functions called during macroexpansion must be defined using defmacfn in lieu of defn."
+            )
+            builder.setPositiveButton(
+                "OK"
+            ) { dialog, id ->
+                consentedToChivorcam = true
+                suppressPrinting = true
+                eval("(require '[chivorcam.core :refer [defmacro defmacfn]])", true)
+                suppressPrinting = false
+                eval(s, true)
+            }
+            builder.setNegativeButton(
+                "Cancel"
+            ) { dialog, id ->
+                dialog.cancel()
+            }
+            builder.show()
+        }
+    }
+
+    private fun eval(input: String, mainThread: Boolean = false) {
+        val s = """replete.repl.read_eval_print(`${input.replace("\"", "\\\"")}`);"""
+        if (mainThread) {
+            vm.executeScript(s)
+        } else {
+            ExecuteScriptTask(vm).execute(s)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -713,7 +769,11 @@ class MainActivity : AppCompatActivity() {
             adapter!!.update(Item(SpannableString(input), ItemType.INPUT))
 
             try {
-                ExecuteScriptTask(vm).execute("""replete.repl.read_eval_print(`${input.replace("\"", "\\\"")}`);""")
+                if (isMacro(input) && !chivorcamReferred()) {
+                    defmacroCalled(input)
+                } else {
+                    eval(input)
+                }
             } catch (e: Exception) {
                 adapter!!.update(Item(SpannableString(e.toString()), ItemType.ERROR))
             }
