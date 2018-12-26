@@ -26,7 +26,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets.UTF_8
-import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
 
@@ -468,10 +467,8 @@ class MainActivity : AppCompatActivity() {
 
     private val repleteIsDirectory = JavaCallback { receiver, params ->
         if (params.length() > 0) {
-            val path = params.get(0) as V8Value
-            val ret = Files.isDirectory(Paths.get(path.toString()))
-            path.release()
-            return@JavaCallback ret
+            val path = params.getString(0)
+            return@JavaCallback toAbsolutePath(path).isDirectory
         } else {
             return@JavaCallback V8.getUndefined()
         }
@@ -479,12 +476,10 @@ class MainActivity : AppCompatActivity() {
 
     private val repleteListFiles = JavaCallback { receiver, params ->
         if (params.length() > 0) {
-            val path = params.get(0) as V8Value
+            val path = params.getString(0)
             val ret = V8Array(vm)
 
-            Files.list(Paths.get(path.toString())).forEach { p -> ret.push(p.toString()) }
-
-            path.release()
+            toAbsolutePath(path).list().forEach { p -> ret.push(p.toString()) }
 
             return@JavaCallback ret
         } else {
@@ -497,7 +492,7 @@ class MainActivity : AppCompatActivity() {
             val path = params.getString(0)
 
             try {
-                deleteFile(path)
+                toAbsolutePath(path).delete()
             } catch (e: IOException) {
                 displayError(e)
             }
@@ -510,8 +505,8 @@ class MainActivity : AppCompatActivity() {
         if (params.length() == 2) {
             val fromPath = params.getString(0)
             val toPath = params.getString(1)
-            val fromStream = openFileInput(fromPath)
-            val toStream = openFileOutput(toPath, Context.MODE_PRIVATE)
+            val fromStream = toAbsolutePath(fromPath).inputStream()
+            val toStream = toAbsolutePath(toPath).outputStream()
 
             try {
                 fromStream.copyTo(toStream)
@@ -559,10 +554,9 @@ class MainActivity : AppCompatActivity() {
             val path = params.getString(0)
             val append = params.getBoolean(1)
             val encoding = params.getString(2)
-            val out =
-                openFileOutput(path, if (append) Context.MODE_APPEND else Context.MODE_PRIVATE).writer(Charsets.UTF_8)
 
-            openWriteFiles[path] = out
+            openWriteFiles[path] =
+                    FileOutputStream(toAbsolutePath(path), append).writer(Charsets.UTF_8)
 
             return@JavaCallback path
         } else {
@@ -624,9 +618,8 @@ class MainActivity : AppCompatActivity() {
         if (params.length() == 2) {
             val path = params.getString(0)
             val encoding = params.getString(1)
-            val out = openFileInput(path).reader(Charsets.UTF_8)
 
-            openReadFiles[path] = out
+            openReadFiles[path] = toAbsolutePath(path).inputStream().reader(Charsets.UTF_8)
 
             return@JavaCallback path
         } else {
