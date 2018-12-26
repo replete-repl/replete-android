@@ -13,6 +13,7 @@ import android.widget.*
 import com.eclipsesource.v8.*
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.res.Configuration
 import android.os.*
 import android.provider.UserDictionary
 import android.text.Spannable
@@ -656,6 +657,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateWidth() {
+        if (isVMLoaded) {
+            val replHistory: ListView = findViewById(R.id.repl_history)
+            val width: Double = (replHistory.width / 29).toDouble()
+            vm.getObject("replete").getObject("repl").executeFunction("set_width", V8Array(vm).push(width))
+        }
+    }
+
+    override fun onConfigurationChanged(cfg: Configuration) {
+        if (resources.configuration.orientation != cfg.orientation) {
+            updateWidth()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -829,6 +844,7 @@ class MainActivity : AppCompatActivity() {
             adapter!!,
             { result: BootstrapTaskResult.Result ->
                 isVMLoaded = true
+                updateWidth()
 //                addWords(result.words)
             },
             { s -> bundleGetContents(s) }).execute()
