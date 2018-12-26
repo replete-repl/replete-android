@@ -714,11 +714,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun eval(input: String, mainThread: Boolean = false) {
-        val s = """replete.repl.read_eval_print(`${input.replace("\"", "\\\"")}`);"""
         if (mainThread) {
-            vm.executeScript(s)
+            vm.getObject("replete").getObject("repl").executeFunction("read_eval_print", V8Array(vm).push(input))
         } else {
-            ExecuteScriptTask(vm, { disableEvalButton() }, { enableEvalButton() }).execute(s)
+            ExecuteScriptTask(vm, { disableEvalButton() }, { enableEvalButton() }).execute(input)
         }
     }
 
@@ -948,7 +947,7 @@ class ExecuteScriptTask(val vm: V8, val onPre: () -> Unit, val onPost: () -> Uni
 
     override fun doInBackground(vararg params: String) {
         vm.locker.acquire()
-        vm.executeScript(params[0])
+        vm.getObject("replete").getObject("repl").executeFunction("read_eval_print", V8Array(vm).push(params[0]))
         vm.locker.release()
     }
 
