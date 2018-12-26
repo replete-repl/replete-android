@@ -710,8 +710,9 @@ class MainActivity : AppCompatActivity() {
         evalButton!!.setTextColor(Color.GRAY)
     }
 
-    private fun enableEvalButton() {
-        if (inputField!!.text.isNotEmpty()) {
+    private fun enableEvalButton(withCheck: Boolean = false) {
+        val shouldEnable = if (withCheck) inputField!!.text.isNotEmpty() else true
+        if (shouldEnable) {
             evalButton!!.isEnabled = true
             evalButton!!.setTextColor(Color.rgb(0, 153, 204))
             isExecutingTask = false
@@ -939,7 +940,7 @@ class MainActivity : AppCompatActivity() {
             { result: BootstrapTaskResult.Result ->
                 isVMLoaded = true
                 updateWidth()
-                enableEvalButton()
+                enableEvalButton(true)
 //                addWords(result.words)
             },
             { s -> bundleGetContents(s) }).execute(deviceType)
