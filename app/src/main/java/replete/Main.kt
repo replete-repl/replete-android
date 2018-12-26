@@ -29,6 +29,8 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
     return s.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
@@ -213,7 +215,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val repleteRequest = JavaCallback { receiver, parameters ->
-        if (parameters.length() > 0 && parameters.get(0) is V8Object) {
+        if (parameters.length() == 1 && parameters.get(0) is V8Object) {
             val opts = parameters.get(0) as V8Object
 
             val url = try {
@@ -654,7 +656,11 @@ class MainActivity : AppCompatActivity() {
         if (mainThread) {
             vm.executeScript(s)
         } else {
-            ExecuteScriptTask(vm).execute(s)
+            try {
+                ExecuteScriptTask(vm).execute(s).get(30000, TimeUnit.MILLISECONDS)
+            } catch (e: TimeoutException) {
+                adapter!!.update(Item(SpannableString("This operation took too long to execute"), ItemType.ERROR))
+            }
         }
     }
 
@@ -886,7 +892,7 @@ class ExecuteScriptTask(val vm: V8) : AsyncTask<String, Unit, Unit>() {
     }
 }
 
-open class BootstrapTaskResult() {
+open class BootstrapTaskResult {
     class Error(val error: V8ScriptExecutionException) : BootstrapTaskResult()
     class Result(val words: ArrayList<String>) : BootstrapTaskResult()
 }
