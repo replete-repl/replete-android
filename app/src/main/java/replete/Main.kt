@@ -506,6 +506,27 @@ class MainActivity : AppCompatActivity() {
         return@JavaCallback V8.getUndefined()
     }
 
+    private val repleteCopyFile = JavaCallback { receiver, params ->
+        if (params.length() == 2) {
+            val fromPath = params.getString(0)
+            val toPath = params.getString(1)
+            val fromStream = openFileInput(fromPath)
+            val toStream = openFileOutput(toPath, Context.MODE_PRIVATE)
+
+            try {
+                fromStream.copyTo(toStream)
+                fromStream.close()
+                toStream.close()
+            } catch (e: IOException) {
+                fromStream.close()
+                toStream.close()
+                displayError(e)
+            }
+
+        }
+        return@JavaCallback V8.getUndefined()
+    }
+
     private fun displayError(e: Exception) {
         adapter!!.update(Item(SpannableString(e.toString()), ItemType.ERROR))
     }
@@ -877,6 +898,7 @@ class MainActivity : AppCompatActivity() {
         vm.registerJavaMethod(repleteIsDirectory, "REPLETE_IS_DIRECTORY");
         vm.registerJavaMethod(repleteListFiles, "REPLETE_LIST_FILES");
         vm.registerJavaMethod(repleteDeleteFile, "REPLETE_DELETE");
+        vm.registerJavaMethod(repleteCopyFile, "REPLETE_COPY");
 
         vm.registerJavaMethod(repleteFileReaderOpen, "REPLETE_FILE_READER_OPEN");
         vm.registerJavaMethod(repleteFileReaderRead, "REPLETE_FILE_READER_READ");
