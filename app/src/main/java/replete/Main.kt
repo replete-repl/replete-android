@@ -492,6 +492,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val repleteDeleteFile = JavaCallback { receiver, params ->
+        if (params.length() == 1) {
+            val path = params.getString(0)
+
+            try {
+                deleteFile(path)
+            } catch (e: IOException) {
+                displayError(e)
+            }
+
+        }
+        return@JavaCallback V8.getUndefined()
+    }
+
+    private fun displayError(e: Exception) {
+        adapter!!.update(Item(SpannableString(e.toString()), ItemType.ERROR))
+    }
+
     private val openWriteFiles = mutableMapOf<String, OutputStreamWriter>()
 
     private val repleteFileWriterOpen = JavaCallback { receiver, params ->
@@ -825,7 +843,7 @@ class MainActivity : AppCompatActivity() {
                     eval(input)
                 }
             } catch (e: Exception) {
-                adapter!!.update(Item(SpannableString(e.toString()), ItemType.ERROR))
+                displayError(e)
             }
 
         }
@@ -858,6 +876,7 @@ class MainActivity : AppCompatActivity() {
 
         vm.registerJavaMethod(repleteIsDirectory, "REPLETE_IS_DIRECTORY");
         vm.registerJavaMethod(repleteListFiles, "REPLETE_LIST_FILES");
+        vm.registerJavaMethod(repleteDeleteFile, "REPLETE_DELETE");
 
         vm.registerJavaMethod(repleteFileReaderOpen, "REPLETE_FILE_READER_OPEN");
         vm.registerJavaMethod(repleteFileReaderRead, "REPLETE_FILE_READER_READ");
