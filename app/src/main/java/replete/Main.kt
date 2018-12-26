@@ -15,7 +15,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.res.Configuration
 import android.os.*
-import android.provider.UserDictionary
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
@@ -27,7 +26,6 @@ import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Paths
-import java.util.*
 
 fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
     return s.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
@@ -76,13 +74,20 @@ class MainActivity : AppCompatActivity() {
 
     private var adapter: HistoryAdapter? = null
 
-    private fun bundleGetContents(path: String): String {
-        return assets.open("out/$path").bufferedReader().readText()
+    private fun bundleGetContents(path: String): String? {
+        return try {
+            val reader = assets.open("out/$path").bufferedReader()
+            val ret = reader.readText()
+            reader.close()
+            ret
+        } catch (e: IOException) {
+            null
+        }
     }
 
     private fun getClojureScriptVersion(): String {
         val s = bundleGetContents("replete/bundle.js")
-        return s.substring(29, s.length).takeWhile { c -> c != " ".toCharArray()[0] }
+        return s?.substring(29, s.length)?.takeWhile { c -> c != " ".toCharArray()[0] } ?: ""
     }
 
     private var intervalId: Long = 0
@@ -345,14 +350,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val repleteLoad = JavaCallback { receiver, parameters ->
-        if (parameters.length() > 0) {
-            val arg = parameters.get(0)
-            val path = arg.toString()
-
-            if (arg is Releasable) {
-                arg.release()
-            }
-
+        if (parameters.length() == 1) {
+            val path = parameters.getString(0)
             return@JavaCallback bundleGetContents(path)
         } else {
             return@JavaCallback V8.getUndefined()
@@ -362,23 +361,21 @@ class MainActivity : AppCompatActivity() {
     private val loadedLibs = mutableSetOf<String>()
 
     private val amblyImportScript = JavaCallback { receiver, parameters ->
-        if (parameters.length() > 0) {
-            val arg = parameters.get(0)
-            var path = arg.toString()
+        if (parameters.length() == 1) {
+            var path = parameters.getString(0)
 
             if (!loadedLibs.contains(path)) {
-
-                loadedLibs.add(path)
 
                 if (path.startsWith("goog/../")) {
                     path = path.substring(8, path.length)
                 }
 
-                vm.executeScript(bundleGetContents(path))
-            }
+                val script = bundleGetContents(path)
 
-            if (arg is Releasable) {
-                arg.release()
+                if (script != null) {
+                    loadedLibs.add(path)
+                    vm.executeScript(script)
+                }
             }
         }
         return@JavaCallback V8.getUndefined()
@@ -966,7 +963,7 @@ class BootstrapTask(
     val vm: V8,
     val adapter: HistoryAdapter,
     val onVMLoaded: (BootstrapTaskResult.Result) -> Unit,
-    val bundleGetContents: (String) -> String
+    val bundleGetContents: (String) -> String?
 ) :
     AsyncTask<String, Unit, BootstrapTaskResult>() {
 
@@ -987,8 +984,14 @@ class BootstrapTask(
 
             vm.executeScript("CLOSURE_IMPORT_SCRIPT = function(src) { AMBLY_IMPORT_SCRIPT('goog/' + src); return true; }")
 
-            vm.executeScript(bundleGetContents(goog_base_path))
-            vm.executeScript(bundleGetContents(deps_file_path))
+            val googBaseScript = bundleGetContents(goog_base_path)
+            val depsScript = bundleGetContents(deps_file_path)
+            if (googBaseScript != null) {
+                vm.executeScript(googBaseScript)
+                if (depsScript != null) {
+                    vm.executeScript(depsScript)
+                }
+            }
 
             vm.executeScript("goog.isProvided_ = function(x) { return false; };")
             vm.executeScript("goog.require = function (name) { return CLOSURE_IMPORT_SCRIPT(goog.dependencies_.nameToPath[name]); };")
