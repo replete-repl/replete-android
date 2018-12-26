@@ -711,9 +711,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun enableEvalButton() {
-        evalButton!!.isEnabled = true
-        evalButton!!.setTextColor(Color.rgb(0, 153, 204))
-        isExecutingTask = false
+        if (inputField!!.text.isNotEmpty()) {
+            evalButton!!.isEnabled = true
+            evalButton!!.setTextColor(Color.rgb(0, 153, 204))
+            isExecutingTask = false
+        }
     }
 
     private fun eval(input: String, mainThread: Boolean = false) {
@@ -756,6 +758,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     var evalButton: Button? = null
+    var inputField: EditText? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -764,12 +767,12 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
-        val inputField: EditText = findViewById(R.id.input)
+        inputField = findViewById(R.id.input)
         val replHistory: ListView = findViewById(R.id.repl_history)
         evalButton = findViewById(R.id.eval_button)
 
-        inputField.hint = "Type in here"
-        inputField.setHintTextColor(Color.GRAY)
+        inputField!!.hint = "Type in here"
+        inputField!!.setHintTextColor(Color.GRAY)
 
         evalButton!!.isEnabled = false
         evalButton!!.setTextColor(Color.GRAY)
@@ -832,7 +835,7 @@ class MainActivity : AppCompatActivity() {
         var isParinferChange = false
         var enterPressed = false
 
-        inputField.addTextChangedListener(object : TextWatcher {
+        inputField!!.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
                 if (s != null) {
                     evalButton!!.isEnabled = !s.isNullOrEmpty() and isVMLoaded and !isExecutingTask
@@ -845,10 +848,10 @@ class MainActivity : AppCompatActivity() {
                         isParinferChange = true
 
                         if (isVMLoaded) {
-                            runParinfer(inputField, s, enterPressed)
+                            runParinfer(inputField!!, s, enterPressed)
                             enterPressed = false
                         } else {
-                            runPoorMansParinfer(inputField, s)
+                            runPoorMansParinfer(inputField!!, s)
                         }
                     } else {
                         isParinferChange = false
@@ -867,8 +870,8 @@ class MainActivity : AppCompatActivity() {
         })
 
         evalButton!!.setOnClickListener { v ->
-            val input = inputField.text.toString()
-            inputField.text.clear()
+            val input = inputField!!.text.toString()
+            inputField!!.text.clear()
             adapter!!.update(Item(SpannableString(input), ItemType.INPUT))
 
             try {
