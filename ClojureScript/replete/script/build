@@ -98,7 +98,8 @@ cp aot-cache/chivorcam_SLASH_core\$macros.js.map.json out/chivorcam/core\$macros
 echo "Compiling ClojureScript"
 lein run -m clojure.main script/build.clj
 
-# script/bundle
+echo "Moving into app assets..."
+rm -f out/cljs/core\$macros.cljc
+find out -name "*.map" -type f -delete
 mkdir -p ../../app/src/main/assets/
 cp -r out ../../app/src/main/assets/
-find ../../app/src/main/assets/out -name "*.map" -type f -delete

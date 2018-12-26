@@ -1011,7 +1011,6 @@ class BootstrapTask(
             vm.executeScript("goog.provide('cljs.user');")
             vm.executeScript("goog.require('cljs.core');")
             vm.executeScript("goog.require('replete.repl');")
-            vm.executeScript("goog.require('replete.core');")
             vm.executeScript("replete.repl.setup_cljs_user();")
             vm.executeScript("replete.repl.init_app_env({'debug-build': false, 'target-simulator': false, 'user-interface-idiom': '${params[0]}'});")
             vm.executeScript("cljs.core.system_time = REPLETE_HIGH_RES_TIMER;")
