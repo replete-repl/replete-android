@@ -29,8 +29,6 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.*
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 
 fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
     return s.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
@@ -651,16 +649,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    var isExecutingTask = false
+
+    private fun disableEvalButton() {
+        isExecutingTask = true
+        evalButton!!.isEnabled = false
+        evalButton!!.setTextColor(Color.GRAY)
+    }
+
+    private fun enableEvalButton() {
+        evalButton!!.isEnabled = true
+        evalButton!!.setTextColor(Color.rgb(0, 153, 204))
+        isExecutingTask = false
+    }
+
     private fun eval(input: String, mainThread: Boolean = false) {
         val s = """replete.repl.read_eval_print(`${input.replace("\"", "\\\"")}`);"""
         if (mainThread) {
             vm.executeScript(s)
         } else {
-            try {
-                ExecuteScriptTask(vm).execute(s).get(30000, TimeUnit.MILLISECONDS)
-            } catch (e: TimeoutException) {
-                adapter!!.update(Item(SpannableString("This operation took too long to execute"), ItemType.ERROR))
-            }
+            ExecuteScriptTask(vm, { disableEvalButton() }, { enableEvalButton() }).execute(s)
         }
     }
 
@@ -694,6 +702,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    var evalButton: Button? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -703,13 +713,13 @@ class MainActivity : AppCompatActivity() {
 
         val inputField: EditText = findViewById(R.id.input)
         val replHistory: ListView = findViewById(R.id.repl_history)
-        val evalButton: Button = findViewById(R.id.eval_button)
+        evalButton = findViewById(R.id.eval_button)
 
         inputField.hint = "Type in here"
         inputField.setHintTextColor(Color.GRAY)
 
-        evalButton.isEnabled = false
-        evalButton.setTextColor(Color.GRAY)
+        evalButton!!.isEnabled = false
+        evalButton!!.setTextColor(Color.GRAY)
 
         adapter = HistoryAdapter(this, R.layout.list_item, replHistory)
 
@@ -772,11 +782,11 @@ class MainActivity : AppCompatActivity() {
         inputField.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
                 if (s != null) {
-                    evalButton.isEnabled = !s.isNullOrEmpty() and isVMLoaded
-                    if (evalButton.isEnabled) {
-                        evalButton.setTextColor(Color.rgb(0, 153, 204))
+                    evalButton!!.isEnabled = !s.isNullOrEmpty() and isVMLoaded and !isExecutingTask
+                    if (evalButton!!.isEnabled) {
+                        evalButton!!.setTextColor(Color.rgb(0, 153, 204))
                     } else {
-                        evalButton.setTextColor(Color.GRAY)
+                        evalButton!!.setTextColor(Color.GRAY)
                     }
                     if (!s.isNullOrEmpty() and !isParinferChange) {
                         isParinferChange = true
@@ -803,7 +813,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        evalButton.setOnClickListener { v ->
+        evalButton!!.setOnClickListener { v ->
             val input = inputField.text.toString()
             inputField.text.clear()
             adapter!!.update(Item(SpannableString(input), ItemType.INPUT))
@@ -876,8 +886,9 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-class ExecuteScriptTask(val vm: V8) : AsyncTask<String, Unit, Unit>() {
+class ExecuteScriptTask(val vm: V8, val onPre: () -> Unit, val onPost: () -> Unit) : AsyncTask<String, Unit, Unit>() {
     override fun onPreExecute() {
+        onPre()
         vm.locker.release()
     }
 
@@ -889,6 +900,7 @@ class ExecuteScriptTask(val vm: V8) : AsyncTask<String, Unit, Unit>() {
 
     override fun onPostExecute(result: Unit?) {
         vm.locker.acquire()
+        onPost()
     }
 }
 
