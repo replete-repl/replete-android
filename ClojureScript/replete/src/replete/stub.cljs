@@ -3,4 +3,5 @@
   replete.bundle 
   replete.repl
   replete.core
-  replete.io))
+  replete.io
+  replete.http))
