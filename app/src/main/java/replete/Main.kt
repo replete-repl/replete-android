@@ -527,8 +527,29 @@ class MainActivity : AppCompatActivity() {
         return@JavaCallback V8.getUndefined()
     }
 
+    private val repleteMakeParentDirectories = JavaCallback { receiver, params ->
+        if (params.length() == 1) {
+            val path = params.getString(0)
+            val absPath = toAbsolutePath(path)
+
+            try {
+                if (!absPath.exists()) {
+                    absPath.mkdirs()
+                }
+            } catch (e: Exception) {
+                displayError(e)
+            }
+
+        }
+        return@JavaCallback V8.getUndefined()
+    }
+
     private fun displayError(e: Exception) {
         adapter!!.update(Item(SpannableString(e.toString()), ItemType.ERROR))
+    }
+
+    private fun toAbsolutePath(path: String): File {
+        return File(Paths.get(filesDir.path, path).toUri())
     }
 
     private val openWriteFiles = mutableMapOf<String, OutputStreamWriter>()
@@ -899,6 +920,7 @@ class MainActivity : AppCompatActivity() {
         vm.registerJavaMethod(repleteListFiles, "REPLETE_LIST_FILES");
         vm.registerJavaMethod(repleteDeleteFile, "REPLETE_DELETE");
         vm.registerJavaMethod(repleteCopyFile, "REPLETE_COPY");
+        vm.registerJavaMethod(repleteMakeParentDirectories, "REPLETE_MKDIRS");
 
         vm.registerJavaMethod(repleteFileReaderOpen, "REPLETE_FILE_READER_OPEN");
         vm.registerJavaMethod(repleteFileReaderRead, "REPLETE_FILE_READER_READ");
