@@ -936,6 +936,7 @@ class MainActivity : AppCompatActivity() {
             { result: BootstrapTaskResult.Result ->
                 isVMLoaded = true
                 updateWidth()
+                enableEvalButton()
 //                addWords(result.words)
             },
             { s -> bundleGetContents(s) }).execute(deviceType)
