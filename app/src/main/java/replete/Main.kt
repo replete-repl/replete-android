@@ -427,12 +427,6 @@ class MainActivity : AppCompatActivity() {
         ret.release()
     }
 
-    private fun addWords(words: ArrayList<String>) {
-        words.forEach { word ->
-            UserDictionary.Words.addWord(this, word, 255, null, Locale.getDefault())
-        }
-    }
-
     private val repleteWriteStdout = JavaCallback { receiver, params ->
         if (params.length() > 0) {
             val s = params.get(0)
@@ -941,7 +935,6 @@ class MainActivity : AppCompatActivity() {
                 isVMLoaded = true
                 updateWidth()
                 enableEvalButton(true)
-//                addWords(result.words)
             },
             { s -> bundleGetContents(s) }).execute(deviceType)
     }
@@ -967,7 +960,7 @@ class ExecuteScriptTask(val vm: V8, val onPre: () -> Unit, val onPost: () -> Uni
 
 open class BootstrapTaskResult {
     class Error(val error: V8ScriptExecutionException) : BootstrapTaskResult()
-    class Result(val words: ArrayList<String>) : BootstrapTaskResult()
+    class Result : BootstrapTaskResult()
 }
 
 class BootstrapTask(
@@ -1026,30 +1019,15 @@ class BootstrapTask(
             vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
             vm.executeScript("var window = global;")
 
-            val words = getAllVars()
-
             vm.locker.release()
 
-            return BootstrapTaskResult.Result(words)
+            return BootstrapTaskResult.Result()
         } catch (e: V8ScriptExecutionException) {
             if (vm.locker.hasLock()) {
                 vm.locker.release()
             }
             return BootstrapTaskResult.Error(e)
         }
-    }
-
-    private fun getAllVars(): ArrayList<String> {
-//        val vars = vm.getObject("replete").getObject("repl").executeArrayFunction("all_vars", V8Array(vm))
-        val words = arrayListOf<String>()
-
-//        for (idx in 0 until vars.length()) {
-//            words.add(vars[idx] as String)
-//        }
-
-//        vars.release()
-
-        return words
     }
 
     @TargetApi(Build.VERSION_CODES.KITKAT)
