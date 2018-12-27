@@ -5,12 +5,10 @@ import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Color
 import android.support.v7.app.AppCompatActivity
-import android.support.annotation.RequiresApi
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.*
 import android.widget.*
-import com.eclipsesource.v8.*
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.res.Configuration
@@ -22,11 +20,6 @@ import android.util.DisplayMetrics
 import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
 import java.io.*
-import java.lang.StringBuilder
-import java.net.HttpURLConnection
-import java.net.URL
-import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Paths
 
 fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
@@ -71,7 +64,6 @@ fun markString(s: String): SpannableString {
 @TargetApi(Build.VERSION_CODES.O)
 class MainActivity : AppCompatActivity() {
 
-    private val vm: V8 = V8.createV8Runtime()
     private var isVMLoaded = false
 
     private var adapter: HistoryAdapter? = null
@@ -92,314 +84,6 @@ class MainActivity : AppCompatActivity() {
         return s?.substring(29, s.length)?.takeWhile { c -> c != " ".toCharArray()[0] } ?: ""
     }
 
-    private var intervalId: Long = 0
-    private val intervals: MutableMap<Long, IntervalThread> = mutableMapOf()
-
-    class IntervalThread(val callback: () -> Unit, val onCanceled: () -> Unit, val t: Long) : Thread() {
-        var isIntervalCanceled = false
-        override fun run() {
-            while (true) {
-                Thread.sleep(t)
-                if (isIntervalCanceled) {
-                    onCanceled()
-                    break
-                } else {
-                    callback()
-                }
-            }
-        }
-    }
-
-    private fun setInterval(callback: () -> Unit, onCanceled: () -> Unit, t: Long): Long {
-
-        if (intervalId == 9007199254740991) {
-            intervalId = 0;
-        } else {
-            ++intervalId;
-        }
-
-        val tt = IntervalThread({ runOnUiThread { callback() } }, { runOnUiThread { onCanceled() } }, t)
-        intervals[intervalId] = tt
-
-        tt.start()
-
-        return intervalId
-    }
-
-    private fun cancelInterval(tid: Long) {
-        if (intervals.contains(tid)) {
-            intervals[tid]!!.isIntervalCanceled = true
-            intervals.remove(tid)
-        }
-    }
-
-    private val repleteSetInterval = JavaCallback { receiver, parameters ->
-        if (parameters.length() == 2) {
-            val callback = parameters.get(0) as V8Function
-            val timeout = parameters.getDouble(1).toLong()
-            val tid = setInterval(fun() {
-                callback.call(callback, V8Array(vm))
-            }, { callback.release() }, timeout)
-
-            return@JavaCallback tid.toDouble()
-        } else {
-            return@JavaCallback V8.getUndefined()
-        }
-    }
-
-    private val repleteCancelInterval = JavaCallback { receiver, parameters ->
-        if (parameters.length() == 1) {
-            val tid = parameters.getInteger(0).toLong()
-            cancelInterval(tid)
-        }
-        return@JavaCallback V8.getUndefined()
-    }
-
-    private var timeoutId: Long = 0
-    private val timeouts: MutableMap<Long, TimeoutThread> = mutableMapOf()
-
-    class TimeoutThread(val callback: () -> Unit, val t: Long) : Thread() {
-        var isTimeoutCanceled = false
-        override fun run() {
-            Thread.sleep(t)
-            if (!isTimeoutCanceled) {
-                callback()
-            }
-        }
-    }
-
-    private fun setTimeout(callback: () -> Unit, t: Long): Long {
-
-        if (timeoutId == 9007199254740991) {
-            timeoutId = 0;
-        } else {
-            ++timeoutId;
-        }
-
-        val tt = TimeoutThread({ runOnUiThread { callback() } }, t)
-        timeouts[timeoutId] = tt
-
-        tt.start()
-
-        return timeoutId
-    }
-
-    private fun cancelTimeout(tid: Long) {
-        if (timeouts.contains(tid)) {
-            timeouts[tid]!!.isTimeoutCanceled = true
-            timeouts.remove(tid)
-        }
-    }
-
-    private val repleteSetTimeout = JavaCallback { receiver, parameters ->
-        if (parameters.length() == 2) {
-            val callback = parameters.get(0) as V8Function
-            val timeout = parameters.getDouble(1).toLong()
-            val tid = setTimeout(fun() {
-                callback.call(callback, V8Array(vm))
-                callback.release()
-            }, timeout)
-
-            return@JavaCallback tid.toDouble()
-        } else {
-            return@JavaCallback V8.getUndefined()
-        }
-    }
-
-    private val repleteCancelTimeout = JavaCallback { receiver, parameters ->
-        if (parameters.length() == 1) {
-            val tid = parameters.getInteger(0).toLong()
-            cancelTimeout(tid)
-        }
-        return@JavaCallback V8.getUndefined()
-    }
-
-    private val repleteHighResTimer = JavaCallback { receiver, parameters ->
-        System.nanoTime() / 1e6
-    }
-
-    private val repleteRequest = JavaCallback { receiver, parameters ->
-        if (parameters.length() == 1 && parameters.get(0) is V8Object) {
-            val opts = parameters.get(0) as V8Object
-
-            val url = try {
-                URL(opts.getString("url"))
-            } catch (e: V8ResultUndefined) {
-                null
-            }
-
-            val timeout = try {
-                opts.getInteger("timeout") * 1000
-            } catch (e: V8ResultUndefined) {
-                0
-            }
-
-            val binaryResponse = try {
-                opts.getBoolean("binary-response")
-            } catch (e: V8ResultUndefined) {
-                false
-            }
-
-            val method = try {
-                opts.getString("method")
-            } catch (e: V8ResultUndefined) {
-                "GET"
-            }
-
-            val body = try {
-                opts.getString("body")
-            } catch (e: V8ResultUndefined) {
-                null
-            }
-
-            val headers = try {
-                opts.getObject("headers")
-            } catch (e: V8ResultUndefined) {
-                null
-            }
-
-            val userAgent = try {
-                opts.getString("user-agent")
-            } catch (e: V8ResultUndefined) {
-                null
-            }
-
-            val insecure = try {
-                opts.getBoolean("insecure")
-            } catch (e: V8ResultUndefined) {
-                false
-            }
-
-            val socket = try {
-                opts.getString("socket")
-            } catch (e: V8ResultUndefined) {
-                null
-            }
-
-            opts.release()
-
-            if (url != null) {
-                val conn = url.openConnection() as HttpURLConnection
-
-                conn.allowUserInteraction = false
-                conn.requestMethod = method
-                conn.readTimeout = timeout
-                conn.connectTimeout = timeout
-
-                if (userAgent != null) {
-                    conn.setRequestProperty("User-Agent", userAgent)
-                }
-
-                if (headers != null) {
-                    for (key in headers.keys) {
-                        val value = headers.getString(key)
-                        conn.setRequestProperty(key, value)
-                    }
-                }
-
-                if (body != null) {
-                    val ba = body.toByteArray()
-                    conn.setRequestProperty("Content-Length", ba.size.toString())
-                    conn.doInput = true;
-                    conn.doOutput = true;
-                    conn.useCaches = false;
-
-                    val os = conn.outputStream
-                    os.write(body.toByteArray())
-                    os.close()
-                }
-
-                try {
-                    conn.connect()
-
-                    val result = V8Object(vm)
-
-                    val responseBytes = conn.inputStream.readBytes()
-                    val responseCode = conn.responseCode
-                    val responseHeaders = V8Object(vm)
-
-                    for (entry in conn.headerFields.entries) {
-                        val values = StringBuilder()
-                        for (value in entry.value) {
-                            values.append(value, ",")
-                        }
-                        if (entry.key != null) {
-                            responseHeaders.add(entry.key, values.toString())
-                        }
-                    }
-
-                    result.add("status", responseCode)
-                    result.add("headers", responseHeaders)
-
-                    if (binaryResponse) {
-                        result.add("body", V8ArrayBuffer(vm, ByteBuffer.wrap(responseBytes)))
-                    } else {
-                        result.add("body", String(responseBytes))
-                    }
-
-                    return@JavaCallback result
-                } catch (e: Exception) {
-                    val result = V8Object(vm)
-                    result.add("error", e.message)
-                    return@JavaCallback result
-                }
-            } else {
-                return@JavaCallback V8.getUndefined()
-            }
-        } else {
-            return@JavaCallback V8.getUndefined()
-        }
-    }
-
-    private val repleteLoad = JavaCallback { receiver, parameters ->
-        if (parameters.length() == 1) {
-            val path = parameters.getString(0)
-            return@JavaCallback bundleGetContents(path)
-        } else {
-            return@JavaCallback V8.getUndefined()
-        }
-    }
-
-    private val loadedLibs = mutableSetOf<String>()
-
-    private val amblyImportScript = JavaCallback { receiver, parameters ->
-        if (parameters.length() == 1) {
-            var path = parameters.getString(0)
-
-            if (!loadedLibs.contains(path)) {
-
-                if (path.startsWith("goog/../")) {
-                    path = path.substring(8, path.length)
-                }
-
-                val script = bundleGetContents(path)
-
-                if (script != null) {
-                    loadedLibs.add(path)
-                    vm.executeScript(script)
-                }
-            }
-        }
-        return@JavaCallback V8.getUndefined()
-    }
-
-    private val repletePrintFn = JavaCallback { receiver, parameters ->
-        if (parameters.length() > 0) {
-            val msg = parameters.get(0)
-
-            if (!suppressPrinting) {
-                runOnUiThread {
-                    adapter!!.update(Item(markString(msg.toString()), ItemType.OUTPUT))
-                }
-            }
-
-            if (msg is Releasable) {
-                msg.release()
-            }
-        }
-        return@JavaCallback V8.getUndefined()
-    }
-
     private fun runPoorMansParinfer(inputField: EditText, s: Editable) {
         val cursorPos = inputField.selectionStart
         if (cursorPos == 1) {
@@ -412,240 +96,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun runParinfer(inputField: EditText, s: Editable, enterPressed: Boolean) {
-        val cursorPos = inputField.selectionStart
-        val params = V8Array(vm).push(s.toString()).push(cursorPos).push(enterPressed)
-        val ret = vm.getObject("replete").getObject("repl").executeArrayFunction("format", params)
-        val text = ret[0] as String
-        val cursor = ret[1] as Int
+    private fun applyParinfer(args: Array<*>) {
+        val s = args[0] as Editable
+        val text = args[1] as String
+        val cursor = args[2] as Int
 
         s.replace(0, s.length, text)
-        inputField.setSelection(cursor)
-
-        params.release()
-        ret.release()
+        inputField!!.setSelection(cursor)
     }
 
-    private val repleteWriteStdout = JavaCallback { receiver, params ->
-        if (params.length() > 0) {
-            val s = params.get(0)
-            System.out.printf(s.toString())
-            if (s is Releasable) {
-                s.release()
-            }
+    private fun displayError(error: String) {
+        adapter!!.update(Item(SpannableString(error), ItemType.ERROR))
+    }
+
+    private fun displayInput(input: String) {
+        adapter!!.update(Item(SpannableString(input), ItemType.INPUT))
+    }
+
+    private fun displayOutput(output: SpannableString) {
+        if (!suppressPrinting) {
+            adapter!!.update(Item(output, ItemType.OUTPUT))
         }
-        return@JavaCallback V8.getUndefined()
-    }
-
-    private val repleteFlushStdout = JavaCallback { receiver, params ->
-        System.out.flush()
-        return@JavaCallback V8.getUndefined()
-    }
-
-    private val repleteWriteStderr = JavaCallback { receiver, params ->
-        if (params.length() > 0) {
-            val s = params.get(0)
-            System.err.printf(s.toString())
-            if (s is Releasable) {
-                s.release()
-            }
-        }
-        return@JavaCallback V8.getUndefined()
-    }
-
-    private val repleteFlushStderr = JavaCallback { receiver, params ->
-        System.err.flush()
-        return@JavaCallback V8.getUndefined()
-    }
-
-    private val repleteIsDirectory = JavaCallback { receiver, params ->
-        if (params.length() > 0) {
-            val path = params.getString(0)
-            return@JavaCallback toAbsolutePath(path).isDirectory
-        } else {
-            return@JavaCallback V8.getUndefined()
-        }
-    }
-
-    private val repleteListFiles = JavaCallback { receiver, params ->
-        if (params.length() > 0) {
-            val path = params.getString(0)
-            val ret = V8Array(vm)
-
-            toAbsolutePath(path).list().forEach { p -> ret.push(p.toString()) }
-
-            return@JavaCallback ret
-        } else {
-            return@JavaCallback V8.getUndefined()
-        }
-    }
-
-    private val repleteDeleteFile = JavaCallback { receiver, params ->
-        if (params.length() == 1) {
-            val path = params.getString(0)
-
-            try {
-                toAbsolutePath(path).delete()
-            } catch (e: IOException) {
-                displayError(e)
-            }
-
-        }
-        return@JavaCallback V8.getUndefined()
-    }
-
-    private val repleteCopyFile = JavaCallback { receiver, params ->
-        if (params.length() == 2) {
-            val fromPath = params.getString(0)
-            val toPath = params.getString(1)
-            val fromStream = toAbsolutePath(fromPath).inputStream()
-            val toStream = toAbsolutePath(toPath).outputStream()
-
-            try {
-                fromStream.copyTo(toStream)
-                fromStream.close()
-                toStream.close()
-            } catch (e: IOException) {
-                fromStream.close()
-                toStream.close()
-                displayError(e)
-            }
-
-        }
-        return@JavaCallback V8.getUndefined()
-    }
-
-    private val repleteMakeParentDirectories = JavaCallback { receiver, params ->
-        if (params.length() == 1) {
-            val path = params.getString(0)
-            val absPath = toAbsolutePath(path)
-
-            try {
-                if (!absPath.exists()) {
-                    absPath.mkdirs()
-                }
-            } catch (e: Exception) {
-                displayError(e)
-            }
-
-        }
-        return@JavaCallback V8.getUndefined()
-    }
-
-    private fun displayError(e: Exception) {
-        adapter!!.update(Item(SpannableString(e.toString()), ItemType.ERROR))
     }
 
     private fun toAbsolutePath(path: String): File {
         return File(Paths.get(filesDir.path, path).toUri())
-    }
-
-    private val openWriteFiles = mutableMapOf<String, OutputStreamWriter>()
-
-    private val repleteFileWriterOpen = JavaCallback { receiver, params ->
-        if (params.length() == 3) {
-            val path = params.getString(0)
-            val append = params.getBoolean(1)
-            val encoding = params.getString(2)
-
-            openWriteFiles[path] =
-                    FileOutputStream(toAbsolutePath(path), append).writer(Charsets.UTF_8)
-
-            return@JavaCallback path
-        } else {
-            return@JavaCallback "0"
-        }
-    }
-
-    private val repleteFileWriterWrite = JavaCallback { receiver, params ->
-        if (params.length() == 2) {
-            val path = params.getString(0)
-            val content = params.getString(1)
-
-            try {
-                openWriteFiles[path]!!.write(content)
-            } catch (e: Exception) {
-                return@JavaCallback e.message
-            }
-            return@JavaCallback V8.getUndefined()
-        } else {
-            return@JavaCallback "This functions accepts 2 arguments"
-        }
-    }
-
-    private val repleteFileWriterFlush = JavaCallback { receiver, params ->
-        if (params.length() == 1) {
-            val path = params.getString(0)
-
-            try {
-                openWriteFiles[path]!!.flush()
-            } catch (e: Exception) {
-                return@JavaCallback e.message
-            }
-            return@JavaCallback V8.getUndefined()
-        } else {
-            return@JavaCallback "This functions accepts 1 argument"
-        }
-    }
-
-    private val repleteFileWriterClose = JavaCallback { receiver, params ->
-        if (params.length() == 1) {
-            val path = params.getString(0)
-
-            try {
-                openWriteFiles[path]!!.close()
-                openWriteFiles.remove(path)
-            } catch (e: Exception) {
-                return@JavaCallback e.message
-            }
-
-            return@JavaCallback V8.getUndefined()
-        } else {
-            return@JavaCallback "This functions accepts 1 argument"
-        }
-    }
-
-    private val openReadFiles = mutableMapOf<String, InputStreamReader>()
-
-    private val repleteFileReaderOpen = JavaCallback { receiver, params ->
-        if (params.length() == 2) {
-            val path = params.getString(0)
-            val encoding = params.getString(1)
-
-            openReadFiles[path] = toAbsolutePath(path).inputStream().reader(Charsets.UTF_8)
-
-            return@JavaCallback path
-        } else {
-            return@JavaCallback "0"
-        }
-    }
-
-    private val repleteFileReaderRead = JavaCallback { receiver, params ->
-        if (params.length() == 1) {
-            val path = params.getString(0)
-            val content = openReadFiles[path]!!.read()
-
-            if (content == -1) {
-                return@JavaCallback V8Array(vm).push(V8.getUndefined()).push(V8.getUndefined())
-            } else {
-                return@JavaCallback V8Array(vm).push(content.toChar().toString()).push(V8.getUndefined())
-            }
-        } else {
-            return@JavaCallback V8.getUndefined()
-        }
-    }
-
-    private val repleteFileReaderClose = JavaCallback { receiver, params ->
-        if (params.length() == 1) {
-            val path = params.getString(0)
-
-            openReadFiles[path]!!.close()
-            openReadFiles.remove(path)
-
-            return@JavaCallback V8.getUndefined()
-        } else {
-            return@JavaCallback V8.getUndefined()
-        }
     }
 
     private var selectedPosition = -1
@@ -660,19 +135,14 @@ class MainActivity : AppCompatActivity() {
         return _s.startsWith("(defmacro") || _s.startsWith("(defmacfn")
     }
 
-    private fun chivorcamReferred(): Boolean {
-        return vm.getObject("replete").getObject("repl").executeBooleanFunction("chivorcam_referred", V8Array(vm))
-    }
-
     private var consentedToChivorcam = false
     private var suppressPrinting = false
 
     private fun defmacroCalled(s: String) {
         if (consentedToChivorcam) {
             suppressPrinting = true
-            eval("(require '[chivorcam.core :refer [defmacro defmacfn]])", true)
-            suppressPrinting = false
-            eval(s, true)
+            eval("(require '[chivorcam.core :refer [defmacro defmacfn]])")
+            eval(s)
         } else {
             val builder = AlertDialog.Builder(this)
             builder.setTitle("Enable REPL\nMacro Definitions?")
@@ -686,9 +156,8 @@ class MainActivity : AppCompatActivity() {
             ) { dialog, id ->
                 consentedToChivorcam = true
                 suppressPrinting = true
-                eval("(require '[chivorcam.core :refer [defmacro defmacfn]])", true)
-                suppressPrinting = false
-                eval(s, true)
+                eval("(require '[chivorcam.core :refer [defmacro defmacfn]])")
+                eval(s)
             }
             builder.setNegativeButton(
                 "Cancel"
@@ -716,19 +185,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun eval(input: String, mainThread: Boolean = false) {
-        if (mainThread) {
-            vm.getObject("replete").getObject("repl").executeFunction("read_eval_print", V8Array(vm).push(input))
-        } else {
-            ExecuteScriptTask(vm, { disableEvalButton() }, { enableEvalButton() }).execute(input)
-        }
+    private fun eval(input: String) {
+        disableEvalButton()
+        sendThMessage(Messages.EVAL, input)
     }
 
     private fun updateWidth() {
         if (isVMLoaded) {
             val replHistory: ListView = findViewById(R.id.repl_history)
             val width: Double = (replHistory.width / 29).toDouble()
-            vm.getObject("replete").getObject("repl").executeFunction("set_width", V8Array(vm).push(width))
+            sendThMessage(Messages.SET_WIDTH, width)
         }
     }
 
@@ -806,11 +272,77 @@ class MainActivity : AppCompatActivity() {
     var evalButton: Button? = null
     var inputField: EditText? = null
 
+    enum class Messages(val value: Int) {
+        INIT_VM(0),
+        INIT_ENV(1),
+        BOOTSTRAP_ENV(2),
+        EVAL(3),
+        ADD_ERROR_ITEM(4),
+        ADD_OUTPUT_ITEM(5),
+        ADD_INPUT_ITEM(6),
+        ENABLE_EVAL(7),
+        ENABLE_PRINTING(8),
+        UPDATE_WIDTH(9),
+        SET_WIDTH(10),
+        VM_LOADED(11),
+        CALL_FN(12),
+        RELEASE_OBJ(13),
+        RUN_PARINFER(14),
+        APPLY_PARINFER(15),
+    }
+
+    var uiHandler: Handler? = null
+    var thHandler: Handler? = null
+    var ht: HandlerThread? = null
+
+    private fun sendThMessage(what: Messages, obj: Any? = null) {
+        if (obj != null) {
+            thHandler!!.sendMessage(thHandler!!.obtainMessage(what.value, obj))
+        } else {
+            thHandler!!.sendMessage(thHandler!!.obtainMessage(what.value))
+        }
+    }
+
+    private fun sendUIMessage(what: Messages, obj: Any? = null) {
+        if (obj != null) {
+            uiHandler!!.sendMessage(uiHandler!!.obtainMessage(what.value, obj))
+        } else {
+            uiHandler!!.sendMessage(uiHandler!!.obtainMessage(what.value))
+        }
+    }
+
+    private fun initializeVMThread() {
+        ht = HandlerThread("VMThread")
+        ht!!.start()
+        thHandler = VMHandler(
+            ht!!,
+            { what, obj -> sendUIMessage(what, obj) },
+            { s -> bundleGetContents(s) },
+            { s -> toAbsolutePath(s) }
+        )
+        sendThMessage(Messages.INIT_VM)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        setDeviceType()
+        uiHandler = object : Handler(Looper.getMainLooper()) {
+            override fun handleMessage(msg: Message) {
+                when (msg.what) {
+                    Messages.ADD_INPUT_ITEM.value -> displayInput(msg.obj as String)
+                    Messages.ADD_OUTPUT_ITEM.value -> displayOutput(msg.obj as SpannableString)
+                    Messages.ADD_ERROR_ITEM.value -> displayError(msg.obj as String)
+                    Messages.ENABLE_EVAL.value -> enableEvalButton()
+                    Messages.ENABLE_PRINTING.value -> suppressPrinting = false
+                    Messages.UPDATE_WIDTH.value -> updateWidth()
+                    Messages.VM_LOADED.value -> isVMLoaded = true
+                    Messages.APPLY_PARINFER.value -> applyParinfer(msg.obj as Array<*>)
+                }
+            }
+        }
 
+        initializeVMThread()
+        setDeviceType()
         setContentView(R.layout.activity_main)
 
         inputField = findViewById(R.id.input)
@@ -894,7 +426,13 @@ class MainActivity : AppCompatActivity() {
                         isParinferChange = true
 
                         if (isVMLoaded) {
-                            runParinfer(inputField!!, s, enterPressed)
+                            val cursorPos = inputField!!.selectionStart
+                            thHandler!!.sendMessageAtFrontOfQueue(
+                                thHandler!!.obtainMessage(
+                                    Messages.RUN_PARINFER.value,
+                                    arrayOf(s, enterPressed, cursorPos)
+                                )
+                            )
                             enterPressed = false
                         } else {
                             runPoorMansParinfer(inputField!!, s)
@@ -918,185 +456,31 @@ class MainActivity : AppCompatActivity() {
         evalButton!!.setOnClickListener { v ->
             val input = inputField!!.text.toString()
             inputField!!.text.clear()
-            adapter!!.update(Item(SpannableString(input), ItemType.INPUT))
+            sendUIMessage(Messages.ADD_INPUT_ITEM, input)
 
             try {
-                if (isMacro(input) && !chivorcamReferred()) {
+                if (isMacro(input)) {
                     defmacroCalled(input)
                 } else {
                     eval(input)
                 }
             } catch (e: Exception) {
-                displayError(e)
+                sendUIMessage(Messages.ADD_ERROR_ITEM, e.toString())
             }
 
         }
 
-        adapter!!.update(
-            Item(
-                SpannableString(
-                    "\nClojureScript ${getClojureScriptVersion()}\n" +
-                            "    Docs: (doc function-name)\n" +
-                            "          (find-doc \"part-of-name\")\n" +
-                            "  Source: (source function-name)\n" +
-                            " Results: Stored in *1, *2, *3,\n" +
-                            "          an exception in *e\n"
-                )
-                , ItemType.INPUT
-            )
+        sendUIMessage(
+            Messages.ADD_INPUT_ITEM, "\nClojureScript ${getClojureScriptVersion()}\n" +
+                    "    Docs: (doc function-name)\n" +
+                    "          (find-doc \"part-of-name\")\n" +
+                    "  Source: (source function-name)\n" +
+                    " Results: Stored in *1, *2, *3,\n" +
+                    "          an exception in *e\n"
         )
 
-        vm.registerJavaMethod(repleteLoad, "REPLETE_LOAD");
-        vm.registerJavaMethod(repletePrintFn, "REPLETE_PRINT_FN");
-        vm.registerJavaMethod(amblyImportScript, "AMBLY_IMPORT_SCRIPT");
-        vm.registerJavaMethod(repleteHighResTimer, "REPLETE_HIGH_RES_TIMER");
-        vm.registerJavaMethod(repleteRequest, "REPLETE_REQUEST");
-
-        vm.registerJavaMethod(repleteWriteStdout, "REPLETE_RAW_WRITE_STDOUT");
-        vm.registerJavaMethod(repleteFlushStdout, "REPLETE_RAW_FLUSH_STDOUT");
-
-        vm.registerJavaMethod(repleteWriteStderr, "REPLETE_RAW_WRITE_STDERR");
-        vm.registerJavaMethod(repleteFlushStderr, "REPLETE_RAW_FLUSH_STDERR");
-
-        vm.registerJavaMethod(repleteIsDirectory, "REPLETE_IS_DIRECTORY");
-        vm.registerJavaMethod(repleteListFiles, "REPLETE_LIST_FILES");
-        vm.registerJavaMethod(repleteDeleteFile, "REPLETE_DELETE");
-        vm.registerJavaMethod(repleteCopyFile, "REPLETE_COPY");
-        vm.registerJavaMethod(repleteMakeParentDirectories, "REPLETE_MKDIRS");
-
-        vm.registerJavaMethod(repleteFileReaderOpen, "REPLETE_FILE_READER_OPEN");
-        vm.registerJavaMethod(repleteFileReaderRead, "REPLETE_FILE_READER_READ");
-        vm.registerJavaMethod(repleteFileReaderClose, "REPLETE_FILE_READER_CLOSE");
-
-        vm.registerJavaMethod(repleteFileWriterOpen, "REPLETE_FILE_WRITER_OPEN");
-        vm.registerJavaMethod(repleteFileWriterWrite, "REPLETE_FILE_WRITER_WRITE");
-        vm.registerJavaMethod(repleteFileWriterFlush, "REPLETE_FILE_WRITER_FLUSH");
-        vm.registerJavaMethod(repleteFileWriterClose, "REPLETE_FILE_WRITER_CLOSE");
-
-        vm.registerJavaMethod(repleteSetTimeout, "setTimeout");
-        vm.registerJavaMethod(repleteCancelTimeout, "clearTimeout");
-
-        vm.registerJavaMethod(repleteSetInterval, "setInterval");
-        vm.registerJavaMethod(repleteCancelInterval, "clearInterval");
-
-        BootstrapTask(
-            vm,
-            adapter!!,
-            { result: BootstrapTaskResult.Result ->
-                isVMLoaded = true
-                updateWidth()
-                enableEvalButton(true)
-            },
-            { s -> bundleGetContents(s) }).execute(deviceType)
+        sendThMessage(Messages.INIT_ENV)
+        sendThMessage(Messages.BOOTSTRAP_ENV, deviceType)
     }
 }
 
-class ExecuteScriptTask(val vm: V8, val onPre: () -> Unit, val onPost: () -> Unit) : AsyncTask<String, Unit, Unit>() {
-    override fun onPreExecute() {
-        onPre()
-        vm.locker.release()
-    }
-
-    override fun doInBackground(vararg params: String) {
-        vm.locker.acquire()
-        vm.getObject("replete").getObject("repl").executeFunction("read_eval_print", V8Array(vm).push(params[0]))
-        vm.locker.release()
-    }
-
-    override fun onPostExecute(result: Unit?) {
-        vm.locker.acquire()
-        onPost()
-    }
-}
-
-open class BootstrapTaskResult {
-    class Error(val error: V8ScriptExecutionException) : BootstrapTaskResult()
-    class Result : BootstrapTaskResult()
-}
-
-class BootstrapTask(
-    val vm: V8,
-    val adapter: HistoryAdapter,
-    val onVMLoaded: (BootstrapTaskResult.Result) -> Unit,
-    val bundleGetContents: (String) -> String?
-) :
-    AsyncTask<String, Unit, BootstrapTaskResult>() {
-
-    override fun onPreExecute() {
-        vm.locker.release()
-    }
-
-    override fun doInBackground(vararg params: String?): BootstrapTaskResult {
-
-        try {
-
-            vm.locker.acquire()
-
-            val deps_file_path = "main.js"
-            val goog_base_path = "goog/base.js"
-
-            vm.executeScript("var global = this;")
-
-            vm.executeScript("CLOSURE_IMPORT_SCRIPT = function(src) { AMBLY_IMPORT_SCRIPT('goog/' + src); return true; }")
-
-            val googBaseScript = bundleGetContents(goog_base_path)
-            val depsScript = bundleGetContents(deps_file_path)
-            if (googBaseScript != null) {
-                vm.executeScript(googBaseScript)
-                if (depsScript != null) {
-                    vm.executeScript(depsScript)
-                }
-            }
-
-            vm.executeScript("goog.isProvided_ = function(x) { return false; };")
-            vm.executeScript("goog.require = function (name) { return CLOSURE_IMPORT_SCRIPT(goog.dependencies_.nameToPath[name]); };")
-            vm.executeScript("goog.require('cljs.core');")
-            vm.executeScript(
-                "cljs.core._STAR_loaded_libs_STAR_ = cljs.core.into.call(null, cljs.core.PersistentHashSet.EMPTY, [\"cljs.core\"]);\n" +
-                        "goog.require = function (name, reload) {\n" +
-                        "    if(!cljs.core.contains_QMARK_(cljs.core._STAR_loaded_libs_STAR_, name) || reload) {\n" +
-                        "        var AMBLY_TMP = cljs.core.PersistentHashSet.EMPTY;\n" +
-                        "        if (cljs.core._STAR_loaded_libs_STAR_) {\n" +
-                        "            AMBLY_TMP = cljs.core._STAR_loaded_libs_STAR_;\n" +
-                        "        }\n" +
-                        "        cljs.core._STAR_loaded_libs_STAR_ = cljs.core.into.call(null, AMBLY_TMP, [name]);\n" +
-                        "        CLOSURE_IMPORT_SCRIPT(goog.dependencies_.nameToPath[name]);\n" +
-                        "    }\n" +
-                        "};"
-            )
-
-            vm.executeScript("goog.provide('cljs.user');")
-            vm.executeScript("goog.require('cljs.core');")
-            vm.executeScript("goog.require('replete.repl');")
-            vm.executeScript("replete.repl.setup_cljs_user();")
-            vm.executeScript("replete.repl.init_app_env({'debug-build': false, 'target-simulator': false, 'user-interface-idiom': '${params[0]}'});")
-            vm.executeScript("cljs.core.system_time = REPLETE_HIGH_RES_TIMER;")
-            vm.executeScript("cljs.core.set_print_fn_BANG_.call(null, REPLETE_PRINT_FN);")
-            vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
-            vm.executeScript("var window = global;")
-
-            vm.locker.release()
-
-            return BootstrapTaskResult.Result()
-        } catch (e: V8ScriptExecutionException) {
-            if (vm.locker.hasLock()) {
-                vm.locker.release()
-            }
-            return BootstrapTaskResult.Error(e)
-        }
-    }
-
-    @TargetApi(Build.VERSION_CODES.KITKAT)
-    @RequiresApi(Build.VERSION_CODES.KITKAT)
-    override fun onPostExecute(result: BootstrapTaskResult) {
-        vm.locker.acquire()
-        when (result) {
-            is BootstrapTaskResult.Error -> {
-                val baos = ByteArrayOutputStream()
-                result.error.printStackTrace(PrintStream(baos, true, "UTF-8"))
-                adapter.update(Item(SpannableString(String(baos.toByteArray(), UTF_8)), ItemType.ERROR))
-            }
-            is BootstrapTaskResult.Result -> onVMLoaded(result)
-        }
-    }
-}
