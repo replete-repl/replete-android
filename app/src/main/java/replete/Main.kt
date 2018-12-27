@@ -120,7 +120,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toAbsolutePath(path: String): File {
-        return File(Paths.get(filesDir.path, path).toUri())
+        return filesDir.resolve(if (path.startsWith("/")) path.drop(1) else path)
     }
 
     private var selectedPosition = -1
