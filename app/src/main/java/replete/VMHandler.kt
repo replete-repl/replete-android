@@ -153,38 +153,46 @@ class VMHandler(
     }
 
     private fun populateEnv(vm: V8) {
-        vm.registerJavaMethod(repleteLoad, "REPLETE_LOAD");
-        vm.registerJavaMethod(repletePrintFn, "REPLETE_PRINT_FN");
-        vm.registerJavaMethod(amblyImportScript, "AMBLY_IMPORT_SCRIPT");
-        vm.registerJavaMethod(repleteHighResTimer, "REPLETE_HIGH_RES_TIMER");
-        vm.registerJavaMethod(repleteRequest, "REPLETE_REQUEST");
+        vm.registerJavaMethod(repleteLoad, "REPLETE_LOAD")
+        vm.registerJavaMethod(repletePrintFn, "REPLETE_PRINT_FN")
+        vm.registerJavaMethod(amblyImportScript, "AMBLY_IMPORT_SCRIPT")
+        vm.registerJavaMethod(repleteHighResTimer, "REPLETE_HIGH_RES_TIMER")
+        vm.registerJavaMethod(repleteRequest, "REPLETE_REQUEST")
 
-        vm.registerJavaMethod(repleteWriteStdout, "REPLETE_RAW_WRITE_STDOUT");
-        vm.registerJavaMethod(repleteFlushStdout, "REPLETE_RAW_FLUSH_STDOUT");
+        vm.registerJavaMethod(repleteWriteStdout, "REPLETE_RAW_WRITE_STDOUT")
+        vm.registerJavaMethod(repleteFlushStdout, "REPLETE_RAW_FLUSH_STDOUT")
+        vm.registerJavaMethod(repleteWriteStderr, "REPLETE_RAW_WRITE_STDERR")
+        vm.registerJavaMethod(repleteFlushStderr, "REPLETE_RAW_FLUSH_STDERR")
 
-        vm.registerJavaMethod(repleteWriteStderr, "REPLETE_RAW_WRITE_STDERR");
-        vm.registerJavaMethod(repleteFlushStderr, "REPLETE_RAW_FLUSH_STDERR");
+        vm.registerJavaMethod(repleteIsDirectory, "REPLETE_IS_DIRECTORY")
+        vm.registerJavaMethod(repleteListFiles, "REPLETE_LIST_FILES")
+        vm.registerJavaMethod(repleteDeleteFile, "REPLETE_DELETE")
+        vm.registerJavaMethod(repleteCopyFile, "REPLETE_COPY")
+        vm.registerJavaMethod(repleteMakeParentDirectories, "REPLETE_MKDIRS")
 
-        vm.registerJavaMethod(repleteIsDirectory, "REPLETE_IS_DIRECTORY");
-        vm.registerJavaMethod(repleteListFiles, "REPLETE_LIST_FILES");
-        vm.registerJavaMethod(repleteDeleteFile, "REPLETE_DELETE");
-        vm.registerJavaMethod(repleteCopyFile, "REPLETE_COPY");
-        vm.registerJavaMethod(repleteMakeParentDirectories, "REPLETE_MKDIRS");
+        vm.registerJavaMethod(repleteFileReaderOpen, "REPLETE_FILE_READER_OPEN")
+        vm.registerJavaMethod(repleteFileReaderRead, "REPLETE_FILE_READER_READ")
+        vm.registerJavaMethod(repleteFileReaderClose, "REPLETE_FILE_READER_CLOSE")
 
-        vm.registerJavaMethod(repleteFileReaderOpen, "REPLETE_FILE_READER_OPEN");
-        vm.registerJavaMethod(repleteFileReaderRead, "REPLETE_FILE_READER_READ");
-        vm.registerJavaMethod(repleteFileReaderClose, "REPLETE_FILE_READER_CLOSE");
+        vm.registerJavaMethod(repleteFileWriterOpen, "REPLETE_FILE_WRITER_OPEN")
+        vm.registerJavaMethod(repleteFileWriterWrite, "REPLETE_FILE_WRITER_WRITE")
+        vm.registerJavaMethod(repleteFileWriterFlush, "REPLETE_FILE_WRITER_FLUSH")
+        vm.registerJavaMethod(repleteFileWriterClose, "REPLETE_FILE_WRITER_CLOSE")
 
-        vm.registerJavaMethod(repleteFileWriterOpen, "REPLETE_FILE_WRITER_OPEN");
-        vm.registerJavaMethod(repleteFileWriterWrite, "REPLETE_FILE_WRITER_WRITE");
-        vm.registerJavaMethod(repleteFileWriterFlush, "REPLETE_FILE_WRITER_FLUSH");
-        vm.registerJavaMethod(repleteFileWriterClose, "REPLETE_FILE_WRITER_CLOSE");
+        vm.registerJavaMethod(repleteFileInputStreamOpen, "REPLETE_FILE_INPUT_STREAM_OPEN")
+        vm.registerJavaMethod(repleteFileInputStreamRead, "REPLETE_FILE_INPUT_STREAM_READ")
+        vm.registerJavaMethod(repleteFileInputStreamClose, "REPLETE_FILE_INPUT_STREAM_CLOSE")
 
-        vm.registerJavaMethod(repleteSetTimeout, "setTimeout");
-        vm.registerJavaMethod(repleteCancelTimeout, "clearTimeout");
+        vm.registerJavaMethod(repleteFileOutputStreamOpen, "REPLETE_FILE_OUTPUT_STREAM_OPEN")
+        vm.registerJavaMethod(repleteFileOutputStreamWrite, "REPLETE_FILE_OUTPUT_STREAM_WRITE")
+        vm.registerJavaMethod(repleteFileOutputStreamFlush, "REPLETE_FILE_OUTPUT_STREAM_FLUSH")
+        vm.registerJavaMethod(repleteFileOutputStreamClose, "REPLETE_FILE_OUTPUT_STREAM_CLOSE")
 
-        vm.registerJavaMethod(repleteSetInterval, "setInterval");
-        vm.registerJavaMethod(repleteCancelInterval, "clearInterval");
+        vm.registerJavaMethod(repleteSetTimeout, "setTimeout")
+        vm.registerJavaMethod(repleteCancelTimeout, "clearTimeout")
+
+        vm.registerJavaMethod(repleteSetInterval, "setInterval")
+        vm.registerJavaMethod(repleteCancelInterval, "clearInterval")
     }
 
     private fun eval(s: String) {
@@ -476,7 +484,7 @@ class VMHandler(
     private val repleteWriteStdout = JavaCallback { receiver, params ->
         if (params.length() == 1) {
             val s = params.getString(0)
-            System.out.printf(s)
+            System.out.write(s.toByteArray())
         }
         return@JavaCallback V8.getUndefined()
     }
@@ -489,7 +497,7 @@ class VMHandler(
     private val repleteWriteStderr = JavaCallback { receiver, params ->
         if (params.length() == 1) {
             val s = params.getString(0)
-            System.err.printf(s)
+            System.err.write(s.toByteArray())
         }
         return@JavaCallback V8.getUndefined()
     }
@@ -573,6 +581,73 @@ class VMHandler(
         return@JavaCallback V8.getUndefined()
     }
 
+    private val openOutputStreams = mutableMapOf<String, FileOutputStream>()
+
+    private val repleteFileOutputStreamOpen = JavaCallback { receiver, params ->
+        if (params.length() == 2) {
+            val path = params.getString(0)
+            val append = params.getBoolean(1)
+
+            openOutputStreams[path] = FileOutputStream(toAbsolutePath(path), append)
+
+            return@JavaCallback path
+        } else {
+            return@JavaCallback "0"
+        }
+    }
+
+    private val repleteFileOutputStreamWrite = JavaCallback { receiver, params ->
+        if (params.length() == 2) {
+            val path = params.getString(0)
+            val bytesArray = params.getArray(1)
+
+            try {
+                val bytes = ByteArray(bytesArray.length())
+                for (idx in 0 until bytes.size - 1) {
+                    bytes[idx] = bytesArray[idx] as Byte
+                }
+                openOutputStreams[path]!!.write(bytes)
+            } catch (e: Exception) {
+                return@JavaCallback e.message
+            }
+            return@JavaCallback V8.getUndefined()
+        } else {
+            return@JavaCallback "This functions accepts 2 arguments"
+        }
+    }
+
+    private val repleteFileOutputStreamFlush = JavaCallback { receiver, params ->
+        if (params.length() == 1) {
+            val path = params.getString(0)
+
+            try {
+                openOutputStreams[path]!!.flush()
+            } catch (e: Exception) {
+                return@JavaCallback e.message
+            }
+            return@JavaCallback V8.getUndefined()
+        } else {
+            return@JavaCallback "This functions accepts 1 argument"
+        }
+    }
+
+    private val repleteFileOutputStreamClose = JavaCallback { receiver, params ->
+        if (params.length() == 1) {
+            val path = params.getString(0)
+
+            try {
+                openOutputStreams[path]!!.close()
+                openOutputStreams.remove(path)
+            } catch (e: Exception) {
+                return@JavaCallback e.message
+            }
+
+            return@JavaCallback V8.getUndefined()
+        } else {
+            return@JavaCallback "This functions accepts 1 argument"
+        }
+    }
+
     private val openWriteFiles = mutableMapOf<String, OutputStreamWriter>()
 
     private val repleteFileWriterOpen = JavaCallback { receiver, params ->
@@ -635,6 +710,50 @@ class VMHandler(
             return@JavaCallback V8.getUndefined()
         } else {
             return@JavaCallback "This functions accepts 1 argument"
+        }
+    }
+
+    private val openInputStreams = mutableMapOf<String, FileInputStream>()
+
+    private val repleteFileInputStreamOpen = JavaCallback { receiver, params ->
+        if (params.length() == 1) {
+            val path = params.getString(0)
+            openInputStreams[path] = toAbsolutePath(path).inputStream()
+
+            return@JavaCallback path
+        } else {
+            return@JavaCallback "0"
+        }
+    }
+
+    private val repleteFileInputStreamRead = JavaCallback { receiver, params ->
+        if (params.length() == 1) {
+            val path = params.getString(0)
+            val bytes = ByteArray(1024)
+            val bytesWritten = openInputStreams[path]!!.read(bytes)
+
+            if (bytesWritten == -1) {
+                return@JavaCallback V8.getUndefined()
+            } else {
+                val ret = V8Array(vm)
+                bytes.forEach { b -> ret.push(b) }
+                return@JavaCallback ret
+            }
+        } else {
+            return@JavaCallback V8.getUndefined()
+        }
+    }
+
+    private val repleteFileInputStreamClose = JavaCallback { receiver, params ->
+        if (params.length() == 1) {
+            val path = params.getString(0)
+
+            openInputStreams[path]!!.close()
+            openInputStreams.remove(path)
+
+            return@JavaCallback V8.getUndefined()
+        } else {
+            return@JavaCallback V8.getUndefined()
         }
     }
 
