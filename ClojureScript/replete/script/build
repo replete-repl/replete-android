@@ -51,6 +51,7 @@ echo "AOT compiling macros"
 (require-macros
   'chivorcam.core
   'clojure.test.check.properties
+  'cljs.core.specs.alpha
   'cljs.core.async
   'cljs.core.async.macros
   'cljs.core.async.impl.ioc-macros)
@@ -61,6 +62,7 @@ mkdir -p out/cljs/analyzer
 mkdir -p out/cljs/spec/test
 mkdir -p out/cljs/spec/gen
 mkdir -p out/cljs/core/async/impl
+mkdir -p out/cljs/core/specs
 mkdir -p out/chivorcam
 
 # Complete Hack: Copy AOT'd macros from sibling Planck build tree
@@ -94,6 +96,9 @@ cp aot-cache/cljs_SLASH_core_SLASH_async\$macros.js.map.json out/cljs/core/async
 cp aot-cache/chivorcam_SLASH_core\$macros.cache.json out/chivorcam/core\$macros.cljc.cache.json
 cp aot-cache/chivorcam_SLASH_core\$macros.js out/chivorcam/core\$macros.js
 cp aot-cache/chivorcam_SLASH_core\$macros.js.map.json out/chivorcam/core\$macros.cljc.map.json
+cp aot-cache/cljs_SLASH_core_SLASH_specs_SLASH_alpha\$macros.cache.json out/cljs/core/specs/alpha\$macros.cljc.cache.json
+cp aot-cache/cljs_SLASH_core_SLASH_specs_SLASH_alpha\$macros.js out/cljs/core/specs/alpha\$macros.js
+cp aot-cache/cljs_SLASH_core_SLASH_specs_SLASH_alpha\$macros.js.map.json out/cljs/core/specs/alpha\$macros.cljc.map.json
 
 echo "Compiling ClojureScript"
 lein run -m clojure.main script/build.clj
