@@ -20,7 +20,6 @@ import android.util.DisplayMetrics
 import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
 import java.io.*
-import java.nio.file.Paths
 
 fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
     return s.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
@@ -59,6 +58,26 @@ fun markString(s: String): SpannableString {
     }
 
     return srs
+}
+
+enum class Messages(val value: Int) {
+    INIT_VM(0),
+    INIT_ENV(1),
+    BOOTSTRAP_ENV(2),
+    EVAL(3),
+    ADD_ERROR_ITEM(4),
+    ADD_OUTPUT_ITEM(5),
+    ADD_INPUT_ITEM(6),
+    ENABLE_EVAL(7),
+    ENABLE_PRINTING(8),
+    UPDATE_WIDTH(9),
+    SET_WIDTH(10),
+    VM_LOADED(11),
+    CALL_FN(12),
+    RELEASE_OBJ(13),
+    RUN_PARINFER(14),
+    APPLY_PARINFER(15),
+    NS_LOADED(16),
 }
 
 @TargetApi(Build.VERSION_CODES.O)
@@ -274,25 +293,6 @@ class MainActivity : AppCompatActivity() {
 
     var evalButton: Button? = null
     var inputField: EditText? = null
-
-    enum class Messages(val value: Int) {
-        INIT_VM(0),
-        INIT_ENV(1),
-        BOOTSTRAP_ENV(2),
-        EVAL(3),
-        ADD_ERROR_ITEM(4),
-        ADD_OUTPUT_ITEM(5),
-        ADD_INPUT_ITEM(6),
-        ENABLE_EVAL(7),
-        ENABLE_PRINTING(8),
-        UPDATE_WIDTH(9),
-        SET_WIDTH(10),
-        VM_LOADED(11),
-        CALL_FN(12),
-        RELEASE_OBJ(13),
-        RUN_PARINFER(14),
-        APPLY_PARINFER(15),
-    }
 
     var uiHandler: Handler? = null
     var thHandler: Handler? = null

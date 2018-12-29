@@ -6,7 +6,6 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.Message
 import android.support.annotation.RequiresApi
-import android.text.Editable
 import com.eclipsesource.v8.*
 import java.io.*
 import java.lang.StringBuilder
@@ -42,7 +41,7 @@ class IntervalThread(val callback: () -> Unit, val onCanceled: () -> Unit, val t
 
 class VMHandler(
     val ht: HandlerThread,
-    val sendUIMessage: (MainActivity.Messages, Any?) -> Unit,
+    val sendUIMessage: (Messages, Any?) -> Unit,
     val bundleGetContents: (String) -> String?,
     val toAbsolutePath: (String) -> File
 ) : Handler(ht.looper) {
@@ -51,14 +50,14 @@ class VMHandler(
     @RequiresApi(Build.VERSION_CODES.KITKAT)
     override fun handleMessage(msg: Message) {
         when (msg.what) {
-            MainActivity.Messages.INIT_VM.value -> vm = V8.createV8Runtime()
-            MainActivity.Messages.INIT_ENV.value -> populateEnv(vm!!)
-            MainActivity.Messages.BOOTSTRAP_ENV.value -> bootstrapEnv(vm!!, msg.obj as String)
-            MainActivity.Messages.EVAL.value -> eval(msg.obj as String)
-            MainActivity.Messages.SET_WIDTH.value -> setWidth(msg.obj as Double)
-            MainActivity.Messages.CALL_FN.value -> callFn(msg.obj as V8Function)
-            MainActivity.Messages.RELEASE_OBJ.value -> releaseObject(msg.obj as V8Object)
-            MainActivity.Messages.RUN_PARINFER.value -> runParinfer(msg.obj as Array<*>)
+            Messages.INIT_VM.value -> vm = V8.createV8Runtime()
+            Messages.INIT_ENV.value -> populateEnv(vm!!)
+            Messages.BOOTSTRAP_ENV.value -> bootstrapEnv(vm!!, msg.obj as String)
+            Messages.EVAL.value -> eval(msg.obj as String)
+            Messages.SET_WIDTH.value -> setWidth(msg.obj as Double)
+            Messages.CALL_FN.value -> callFn(msg.obj as V8Function)
+            Messages.RELEASE_OBJ.value -> releaseObject(msg.obj as V8Object)
+            Messages.RUN_PARINFER.value -> runParinfer(msg.obj as Array<*>)
         }
     }
 
@@ -72,7 +71,7 @@ class VMHandler(
         val text = ret[0] as String
         val cursor = ret[1] as Int
 
-        sendUIMessage(MainActivity.Messages.APPLY_PARINFER, arrayOf(s, text, cursor))
+        sendUIMessage(Messages.APPLY_PARINFER, arrayOf(s, text, cursor))
 
         params.release()
         ret.release()
@@ -137,14 +136,14 @@ class VMHandler(
             vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
             vm.executeScript("var window = global;")
 
-            sendUIMessage(MainActivity.Messages.VM_LOADED, null)
-            sendUIMessage(MainActivity.Messages.UPDATE_WIDTH, null)
-            sendUIMessage(MainActivity.Messages.ENABLE_EVAL, null)
+            sendUIMessage(Messages.VM_LOADED, null)
+            sendUIMessage(Messages.UPDATE_WIDTH, null)
+            sendUIMessage(Messages.ENABLE_EVAL, null)
         } catch (e: V8ScriptExecutionException) {
             val baos = ByteArrayOutputStream()
             e.printStackTrace(PrintStream(baos, true, "UTF-8"))
             sendUIMessage(
-                MainActivity.Messages.ADD_ERROR_ITEM, String(
+                Messages.ADD_ERROR_ITEM, String(
                     baos.toByteArray(),
                     StandardCharsets.UTF_8
                 )
@@ -197,8 +196,8 @@ class VMHandler(
 
     private fun eval(s: String) {
         vm!!.getObject("replete").getObject("repl").executeFunction("read_eval_print", V8Array(vm).push(s))
-        sendUIMessage(MainActivity.Messages.ENABLE_EVAL, null)
-        sendUIMessage(MainActivity.Messages.ENABLE_PRINTING, null)
+        sendUIMessage(Messages.ENABLE_EVAL, null)
+        sendUIMessage(Messages.ENABLE_PRINTING, null)
     }
 
     private var intervalId: Long = 0
@@ -214,9 +213,9 @@ class VMHandler(
 
         val tt = IntervalThread(
             {
-                this.sendMessage(this.obtainMessage(MainActivity.Messages.CALL_FN.value, callback))
+                this.sendMessage(this.obtainMessage(Messages.CALL_FN.value, callback))
             },
-            { this.sendMessage(this.obtainMessage(MainActivity.Messages.RELEASE_OBJ.value, callback)) },
+            { this.sendMessage(this.obtainMessage(Messages.RELEASE_OBJ.value, callback)) },
             t
         )
         intervals[intervalId] = tt
@@ -266,8 +265,8 @@ class VMHandler(
 
         val tt =
             TimeoutThread({
-                this.sendMessage(this.obtainMessage(MainActivity.Messages.CALL_FN.value, callback))
-                this.sendMessage(this.obtainMessage(MainActivity.Messages.RELEASE_OBJ.value, callback))
+                this.sendMessage(this.obtainMessage(Messages.CALL_FN.value, callback))
+                this.sendMessage(this.obtainMessage(Messages.RELEASE_OBJ.value, callback))
             }, t)
         timeouts[timeoutId] = tt
 
@@ -476,7 +475,7 @@ class VMHandler(
         if (parameters.length() == 1) {
             val msg = parameters.getString(0)
 
-            sendUIMessage(MainActivity.Messages.ADD_OUTPUT_ITEM, markString(msg))
+            sendUIMessage(Messages.ADD_OUTPUT_ITEM, markString(msg))
         }
         return@JavaCallback V8.getUndefined()
     }
@@ -536,7 +535,7 @@ class VMHandler(
             try {
                 toAbsolutePath(path).delete()
             } catch (e: IOException) {
-                sendUIMessage(MainActivity.Messages.ADD_ERROR_ITEM, e.toString())
+                sendUIMessage(Messages.ADD_ERROR_ITEM, e.toString())
             }
 
         }
@@ -557,7 +556,7 @@ class VMHandler(
             } catch (e: IOException) {
                 fromStream.close()
                 toStream.close()
-                sendUIMessage(MainActivity.Messages.ADD_ERROR_ITEM, e.toString())
+                sendUIMessage(Messages.ADD_ERROR_ITEM, e.toString())
             }
 
         }
@@ -574,7 +573,7 @@ class VMHandler(
                     absPath.mkdirs()
                 }
             } catch (e: Exception) {
-                sendUIMessage(MainActivity.Messages.ADD_ERROR_ITEM, e.toString())
+                sendUIMessage(Messages.ADD_ERROR_ITEM, e.toString())
             }
 
         }
