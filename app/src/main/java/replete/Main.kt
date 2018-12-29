@@ -97,12 +97,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyParinfer(args: Array<*>) {
-        val s = args[0] as Editable
+        val s = inputField!!.text
+        val origText = args[0] as String
         val text = args[1] as String
         val cursor = args[2] as Int
 
-        s.replace(0, s.length, text)
-        inputField!!.setSelection(cursor)
+        if (s.toString() == origText) {
+            s.replace(0, s.length, text)
+            inputField!!.setSelection(cursor)
+        }
     }
 
     private fun displayError(error: String) {
@@ -422,7 +425,7 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         evalButton!!.setTextColor(Color.GRAY)
                     }
-                    if (!s.isNullOrEmpty() and !isParinferChange) {
+                    if (!s.isNullOrEmpty() && !isParinferChange) {
                         isParinferChange = true
 
                         if (isVMLoaded) {
@@ -430,7 +433,7 @@ class MainActivity : AppCompatActivity() {
                             thHandler!!.sendMessageAtFrontOfQueue(
                                 thHandler!!.obtainMessage(
                                     Messages.RUN_PARINFER.value,
-                                    arrayOf(s, enterPressed, cursorPos)
+                                    arrayOf(s.toString(), enterPressed, cursorPos)
                                 )
                             )
                             enterPressed = false

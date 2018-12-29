@@ -63,11 +63,11 @@ class VMHandler(
     }
 
     private fun runParinfer(args: Array<*>) {
-        val s = args[0] as Editable
+        val s = args[0] as String
         val enterPressed = args[1] as Boolean
         val cursorPos = args[2] as Int
 
-        val params = V8Array(vm).push(s.toString()).push(cursorPos).push(enterPressed)
+        val params = V8Array(vm).push(s).push(cursorPos).push(enterPressed)
         val ret = vm!!.getObject("replete").getObject("repl").executeArrayFunction("format", params)
         val text = ret[0] as String
         val cursor = ret[1] as Int
