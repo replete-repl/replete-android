@@ -1,6 +1,6 @@
 (defproject replete "0.1.0"
   :dependencies [[cljsjs/parinfer "1.8.1-0"]]
-  :plugins [[lein-tools-deps "0.4.1"]
+  :plugins [[lein-tools-deps "0.4.3"]
             [lein-cljsbuild "1.1.7"]]
   :middleware [lein-tools-deps.plugin/resolve-dependencies-with-deps-edn]
   :lein-tools-deps/config {:config-files [:install :user :project]}
