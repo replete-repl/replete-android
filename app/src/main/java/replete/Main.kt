@@ -292,7 +292,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     var evalButton: Button? = null
+    var openBracketButton: Button? = null
+    var historyUpButton: Button? = null
+    var historyDownButton: Button? = null
+
     var inputField: EditText? = null
+
 
     var uiHandler: Handler? = null
     var thHandler: Handler? = null
@@ -329,6 +334,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        var historyPosition = 0
+        var sessionList = ArrayList<String>()
+
         uiHandler = object : Handler(Looper.getMainLooper()) {
             override fun handleMessage(msg: Message) {
                 when (msg.what) {
@@ -348,15 +356,20 @@ class MainActivity : AppCompatActivity() {
         setDeviceType()
         setContentView(R.layout.activity_main)
 
-        inputField = findViewById(R.id.input)
         val replHistory: ListView = findViewById(R.id.repl_history)
+
+        inputField = findViewById(R.id.input)
         evalButton = findViewById(R.id.eval_button)
+        historyUpButton = findViewById(R.id.history_up)
+        historyDownButton = findViewById(R.id.history_down)
 
         inputField!!.hint = "Type in here"
         inputField!!.setHintTextColor(Color.GRAY)
 
         evalButton!!.isEnabled = false
         evalButton!!.setTextColor(Color.GRAY)
+
+        openBracketButton = findViewById(R.id.insert_open_bracket)
 
         adapter = HistoryAdapter(this, R.layout.list_item, replHistory)
 
@@ -460,6 +473,8 @@ class MainActivity : AppCompatActivity() {
             val input = inputField!!.text.toString()
             inputField!!.text.clear()
             sendUIMessage(Messages.ADD_INPUT_ITEM, input)
+            sessionList.add(input)
+            historyPosition = sessionList.size
 
             try {
                 if (isMacro(input)) {
@@ -471,6 +486,28 @@ class MainActivity : AppCompatActivity() {
                 sendUIMessage(Messages.ADD_ERROR_ITEM, e.toString())
             }
 
+        }
+        openBracketButton!!.setOnClickListener { v ->
+            val cursorPos = inputField!!.getSelectionStart()
+            inputField!!.text.insert(cursorPos ,"(")
+
+        }
+        historyUpButton!!.setOnClickListener { v ->
+            if (historyPosition > 0) {
+                historyPosition--
+                val histItem = sessionList.get(historyPosition)
+                inputField!!.setText(histItem)
+            }
+        }
+        historyDownButton!!.setOnClickListener { v ->
+            if (historyPosition < sessionList.size -1) {
+                historyPosition++
+                val histItem = sessionList.get(historyPosition)
+                inputField!!.setText(histItem)
+            } else {
+                inputField!!.text.clear()
+                historyPosition = sessionList.size
+            }
         }
 
         sendUIMessage(
