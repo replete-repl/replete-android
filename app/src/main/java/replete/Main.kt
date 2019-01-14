@@ -5,16 +5,13 @@ import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Color
 import android.support.v7.app.AppCompatActivity
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.*
 import android.widget.*
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.res.Configuration
 import android.os.*
-import android.text.Spannable
-import android.text.SpannableString
+import android.text.*
 import android.text.style.ForegroundColorSpan
 import android.util.DisplayMetrics
 import android.view.animation.AlphaAnimation
@@ -116,13 +113,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyParinfer(args: Array<*>) {
-        val s = inputField!!.text
-        val origText = args[0] as String
+        val otext = args[0] as String
         val text = args[1] as String
         val cursor = args[2] as Int
 
-        if (s.toString() == origText) {
-            s.replace(0, s.length, text)
+        if (otext == inputField!!.text.toString()) {
+            inputField!!.text = SpannableStringBuilder(text)
             inputField!!.setSelection(cursor)
         }
     }
@@ -202,8 +198,8 @@ class MainActivity : AppCompatActivity() {
         if (inputField!!.text.isNotEmpty()) {
             evalButton!!.isEnabled = true
             evalButton!!.setTextColor(Color.rgb(0, 153, 204))
-            isExecutingTask = false
         }
+        isExecutingTask = false
     }
 
     private fun eval(input: String) {
@@ -418,7 +414,7 @@ class MainActivity : AppCompatActivity() {
         inputField!!.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
                 if (s != null) {
-                    evalButton!!.isEnabled = !s.isNullOrEmpty() and isVMLoaded and !isExecutingTask
+                    evalButton!!.isEnabled = !s.isNullOrEmpty() && isVMLoaded && !isExecutingTask
                     if (evalButton!!.isEnabled) {
                         evalButton!!.setTextColor(Color.rgb(0, 153, 204))
                     } else {
@@ -429,7 +425,7 @@ class MainActivity : AppCompatActivity() {
 
                         if (isVMLoaded) {
                             val cursorPos = inputField!!.selectionStart
-                            thHandler!!.sendMessageAtFrontOfQueue(
+                            thHandler!!.sendMessage(
                                 thHandler!!.obtainMessage(
                                     Messages.RUN_PARINFER.value,
                                     arrayOf(s.toString(), enterPressed, cursorPos)
