@@ -198,9 +198,8 @@ class MainActivity : AppCompatActivity() {
         evalButton!!.setTextColor(Color.GRAY)
     }
 
-    private fun enableEvalButton(withCheck: Boolean = false) {
-        val shouldEnable = if (withCheck) inputField!!.text.isNotEmpty() else true
-        if (shouldEnable) {
+    private fun enableEvalButton() {
+        if (inputField!!.text.isNotEmpty()) {
             evalButton!!.isEnabled = true
             evalButton!!.setTextColor(Color.rgb(0, 153, 204))
             isExecutingTask = false
