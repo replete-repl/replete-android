@@ -1,10 +1,7 @@
 package replete
 
 import android.annotation.TargetApi
-import android.os.Build
-import android.os.Handler
-import android.os.HandlerThread
-import android.os.Message
+import android.os.*
 import android.support.annotation.RequiresApi
 import com.eclipsesource.v8.*
 import java.io.*
@@ -13,6 +10,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import kotlin.concurrent.thread
+
+data class InitFailedPayload(val message: String, val vm: V8)
 
 class TimeoutThread(val callback: () -> Unit, val t: Long) : Thread() {
     var isTimeoutCanceled = false
@@ -40,41 +42,32 @@ class IntervalThread(val callback: () -> Unit, val onCanceled: () -> Unit, val t
 }
 
 class VMHandler(
-    val ht: HandlerThread,
+    val mainLooper: Looper,
     val sendUIMessage: (Messages, Any?) -> Unit,
     val bundleGetContents: (String) -> String?,
     val toAbsolutePath: (String) -> File
-) : Handler(ht.looper) {
+) : Handler(mainLooper) {
     var vm: V8? = null
     @TargetApi(Build.VERSION_CODES.KITKAT)
     @RequiresApi(Build.VERSION_CODES.KITKAT)
     override fun handleMessage(msg: Message) {
         when (msg.what) {
-            Messages.INIT_VM.value -> vm = V8.createV8Runtime()
-            Messages.INIT_ENV.value -> populateEnv(vm!!)
-            Messages.BOOTSTRAP_ENV.value -> bootstrapEnv(vm!!, msg.obj as String)
+            Messages.INIT_ENV.value -> _initEnv(msg.obj as String)
             Messages.EVAL.value -> eval(msg.obj as String)
             Messages.SET_WIDTH.value -> setWidth(msg.obj as Double)
             Messages.CALL_FN.value -> callFn(msg.obj as V8Function)
             Messages.RELEASE_OBJ.value -> releaseObject(msg.obj as V8Object)
-            Messages.RUN_PARINFER.value -> runParinfer(msg.obj as Array<*>)
         }
     }
 
-    private fun runParinfer(args: Array<*>) {
-        val s = args[0] as String
-        val enterPressed = args[1] as Boolean
-        val cursorPos = args[2] as Int
-
-        val params = V8Array(vm).push(s).push(cursorPos).push(enterPressed)
-        val ret = vm!!.getObject("replete").getObject("repl").executeArrayFunction("format", params)
-        val text = ret[0] as String
-        val cursor = ret[1] as Int
-
-        sendUIMessage(Messages.APPLY_PARINFER, arrayOf(s, text, cursor))
-
-        params.release()
-        ret.release()
+    @TargetApi(Build.VERSION_CODES.KITKAT)
+    @RequiresApi(Build.VERSION_CODES.KITKAT)
+    private fun _initEnv(deviceType: String) {
+        thread {
+            vm = V8.createV8Runtime()
+            populateEnv(vm!!)
+            bootstrapEnv(vm!!, deviceType)
+        }
     }
 
     private fun callFn(fn: V8Function) {
@@ -136,16 +129,22 @@ class VMHandler(
             vm.executeScript("cljs.core.set_print_err_fn_BANG_.call(null, REPLETE_PRINT_FN);")
             vm.executeScript("var window = global;")
 
-            sendUIMessage(Messages.VM_LOADED, null)
+            vm.locker.release()
+
+            sendUIMessage(Messages.VM_LOADED, vm)
             sendUIMessage(Messages.UPDATE_WIDTH, null)
             sendUIMessage(Messages.ENABLE_EVAL, null)
         } catch (e: V8ScriptExecutionException) {
+            vm.locker.release()
             val baos = ByteArrayOutputStream()
             e.printStackTrace(PrintStream(baos, true, "UTF-8"))
             sendUIMessage(
-                Messages.ADD_ERROR_ITEM, String(
-                    baos.toByteArray(),
-                    StandardCharsets.UTF_8
+                Messages.INIT_FAILED,
+                InitFailedPayload(
+                    String(
+                        baos.toByteArray(),
+                        StandardCharsets.UTF_8
+                    ), vm
                 )
             )
         }
@@ -186,6 +185,9 @@ class VMHandler(
         vm.registerJavaMethod(repleteFileOutputStreamWrite, "REPLETE_FILE_OUTPUT_STREAM_WRITE")
         vm.registerJavaMethod(repleteFileOutputStreamFlush, "REPLETE_FILE_OUTPUT_STREAM_FLUSH")
         vm.registerJavaMethod(repleteFileOutputStreamClose, "REPLETE_FILE_OUTPUT_STREAM_CLOSE")
+
+        vm.registerJavaMethod(repleteFStat, "REPLETE_FSTAT")
+        vm.registerJavaMethod(repleteSleep, "REPLETE_SLEEP")
 
         vm.registerJavaMethod(repleteSetTimeout, "setTimeout")
         vm.registerJavaMethod(repleteCancelTimeout, "clearTimeout")
@@ -644,6 +646,34 @@ class VMHandler(
             return@JavaCallback V8.getUndefined()
         } else {
             return@JavaCallback "This functions accepts 1 argument"
+        }
+    }
+
+    private val repleteFStat = JavaCallback { receiver, params ->
+        if (params.length() == 1) {
+            val path = params.getString(0)
+            val item = toAbsolutePath(path)
+
+            val itemType = if (item.isFile) "file" else if (item.isDirectory) "directory" else "unknown"
+
+            val ret = V8Object(vm)
+
+            ret.add("type", itemType)
+            ret.add("modified", item.lastModified().toDouble())
+
+
+            return@JavaCallback ret
+        } else {
+
+        }
+    }
+
+    private val repleteSleep = JavaVoidCallback { receiver, params ->
+        if (params.length() == 1 || params.length() == 2) {
+            val ms = params.getDouble(0).toLong()
+            val ns = if (params.length() == 1) 0 else params.getDouble(1).toInt()
+
+            Thread.sleep(ms, ns)
         }
     }
 

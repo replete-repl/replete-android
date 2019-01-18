@@ -16,7 +16,10 @@ import android.text.style.ForegroundColorSpan
 import android.util.DisplayMetrics
 import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
+import com.eclipsesource.v8.V8
+import com.eclipsesource.v8.V8Array
 import java.io.*
+import kotlin.concurrent.thread
 
 fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
     return s.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
@@ -58,7 +61,6 @@ fun markString(s: String): SpannableString {
 }
 
 enum class Messages(val value: Int) {
-    INIT_VM(0),
     INIT_ENV(1),
     BOOTSTRAP_ENV(2),
     EVAL(3),
@@ -72,9 +74,8 @@ enum class Messages(val value: Int) {
     VM_LOADED(11),
     CALL_FN(12),
     RELEASE_OBJ(13),
-    RUN_PARINFER(14),
-    APPLY_PARINFER(15),
     NS_LOADED(16),
+    INIT_FAILED(17),
 }
 
 @TargetApi(Build.VERSION_CODES.O)
@@ -112,15 +113,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun applyParinfer(args: Array<*>) {
-        val otext = args[0] as String
-        val text = args[1] as String
-        val cursor = args[2] as Int
+    private fun applyParinfer(text: String, cursor: Int) {
+        val s = inputField!!.text
 
-        if (otext == inputField!!.text.toString()) {
-            inputField!!.text = SpannableStringBuilder(text)
-            inputField!!.setSelection(cursor)
-        }
+        s.replace(0, s.length, text, 0, text.length)
+        inputField!!.setSelection(cursor)
     }
 
     private fun displayError(error: String) {
@@ -291,7 +288,6 @@ class MainActivity : AppCompatActivity() {
 
     var uiHandler: Handler? = null
     var thHandler: Handler? = null
-    var ht: HandlerThread? = null
 
     private fun sendThMessage(what: Messages, obj: Any? = null) {
         if (obj != null) {
@@ -309,16 +305,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    var vm: V8? = null
+
     private fun initializeVMThread() {
-        ht = HandlerThread("VMThread")
-        ht!!.start()
         thHandler = VMHandler(
-            ht!!,
+            mainLooper,
             { what, obj -> sendUIMessage(what, obj) },
             { s -> bundleGetContents(s) },
             { s -> toAbsolutePath(s) }
         )
-        sendThMessage(Messages.INIT_VM)
+    }
+
+    fun runParinfer(s: String, enterPressed: Boolean, cursorPos: Int) {
+        val params = V8Array(vm!!).push(s).push(cursorPos).push(enterPressed)
+        val ret = vm!!.getObject("replete").getObject("repl").executeArrayFunction("format", params)
+        val text = ret[0] as String
+        val cursor = ret[1] as Int
+
+        applyParinfer(text, cursor)
+
+        params.release()
+        ret.release()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -333,8 +340,17 @@ class MainActivity : AppCompatActivity() {
                     Messages.ENABLE_EVAL.value -> enableEvalButton()
                     Messages.ENABLE_PRINTING.value -> suppressPrinting = false
                     Messages.UPDATE_WIDTH.value -> updateWidth()
-                    Messages.VM_LOADED.value -> isVMLoaded = true
-                    Messages.APPLY_PARINFER.value -> applyParinfer(msg.obj as Array<*>)
+                    Messages.VM_LOADED.value -> {
+                        vm = msg.obj as V8
+                        vm!!.locker.acquire()
+                        isVMLoaded = true
+                    }
+                    Messages.INIT_FAILED.value -> {
+                        val payload = msg.obj as InitFailedPayload
+                        vm = payload.vm
+                        vm!!.locker.acquire()
+                        displayError(payload.message)
+                    }
                 }
             }
         }
@@ -425,12 +441,7 @@ class MainActivity : AppCompatActivity() {
 
                         if (isVMLoaded) {
                             val cursorPos = inputField!!.selectionStart
-                            thHandler!!.sendMessage(
-                                thHandler!!.obtainMessage(
-                                    Messages.RUN_PARINFER.value,
-                                    arrayOf(s.toString(), enterPressed, cursorPos)
-                                )
-                            )
+                            runParinfer(s.toString(), enterPressed, cursorPos)
                             enterPressed = false
                         } else {
                             runPoorMansParinfer(inputField!!, s)
@@ -477,8 +488,7 @@ class MainActivity : AppCompatActivity() {
                     "          an exception in *e\n"
         )
 
-        sendThMessage(Messages.INIT_ENV)
-        sendThMessage(Messages.BOOTSTRAP_ENV, deviceType)
+        sendThMessage(Messages.INIT_ENV, deviceType)
     }
 }
 
