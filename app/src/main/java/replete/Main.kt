@@ -1,6 +1,5 @@
 package replete
 
-import android.annotation.TargetApi
 import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Color
@@ -19,7 +18,6 @@ import android.view.animation.Animation
 import com.eclipsesource.v8.V8
 import com.eclipsesource.v8.V8Array
 import java.io.*
-import kotlin.concurrent.thread
 
 fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
     return s.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
@@ -78,7 +76,6 @@ enum class Messages(val value: Int) {
     INIT_FAILED(17),
 }
 
-@TargetApi(Build.VERSION_CODES.O)
 class MainActivity : AppCompatActivity() {
 
     private var isVMLoaded = false

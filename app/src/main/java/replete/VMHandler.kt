@@ -1,8 +1,6 @@
 package replete
 
-import android.annotation.TargetApi
 import android.os.*
-import android.support.annotation.RequiresApi
 import com.eclipsesource.v8.*
 import java.io.*
 import java.lang.StringBuilder
@@ -10,8 +8,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.LinkOption
 import kotlin.concurrent.thread
 
 data class InitFailedPayload(val message: String, val vm: V8)
@@ -48,8 +44,7 @@ class VMHandler(
     val toAbsolutePath: (String) -> File
 ) : Handler(mainLooper) {
     var vm: V8? = null
-    @TargetApi(Build.VERSION_CODES.KITKAT)
-    @RequiresApi(Build.VERSION_CODES.KITKAT)
+
     override fun handleMessage(msg: Message) {
         when (msg.what) {
             Messages.INIT_ENV.value -> _initEnv(msg.obj as String)
@@ -60,8 +55,6 @@ class VMHandler(
         }
     }
 
-    @TargetApi(Build.VERSION_CODES.KITKAT)
-    @RequiresApi(Build.VERSION_CODES.KITKAT)
     private fun _initEnv(deviceType: String) {
         thread {
             vm = V8.createV8Runtime()
@@ -82,8 +75,6 @@ class VMHandler(
         vm!!.getObject("replete").getObject("repl").executeFunction("set_width", V8Array(vm).push(width))
     }
 
-    @TargetApi(Build.VERSION_CODES.KITKAT)
-    @RequiresApi(Build.VERSION_CODES.KITKAT)
     private fun bootstrapEnv(vm: V8, deviceType: String) {
         val deps_file_path = "main.js"
         val goog_base_path = "goog/base.js"
