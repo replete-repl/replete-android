@@ -30,7 +30,9 @@ class HistoryAdapter(context: Context, id: Int, val parent: ListView) :
 
     fun update(item: Item) {
         this.add(item)
-        parent.smoothScrollToPosition(this.count - 1)
+        parent.post {
+            parent.smoothScrollToPosition(this.count - 1)
+        }
     }
 
     class ViewHolder(val item: TextView)
