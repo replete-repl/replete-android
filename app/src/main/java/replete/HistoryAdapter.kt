@@ -19,7 +19,7 @@ data class Item(val text: SpannableString, val type: ItemType)
 fun inflateItem(viewHolder: HistoryAdapter.ViewHolder, item: Item) {
     viewHolder.item.text = item.text
     when (item.type) {
-        ItemType.INPUT -> viewHolder.item.setTextColor(Color.GRAY)
+        ItemType.INPUT -> viewHolder.item.setTextColor(Color.DKGRAY)
         ItemType.OUTPUT -> viewHolder.item.setTextColor(Color.BLACK)
         ItemType.ERROR -> viewHolder.item.setTextColor(Color.RED)
     }
