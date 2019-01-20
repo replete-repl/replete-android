@@ -478,14 +478,16 @@ class MainActivity : AppCompatActivity() {
             inputField!!.text.clear()
             sendUIMessage(Messages.ADD_INPUT_ITEM, input)
 
-            try {
-                if (isMacro(input)) {
-                    defmacroCalled(input)
-                } else {
-                    eval(input)
+            uiHandler!!.post {
+                try {
+                    if (isMacro(input)) {
+                        defmacroCalled(input)
+                    } else {
+                        eval(input)
+                    }
+                } catch (e: Exception) {
+                    sendUIMessage(Messages.ADD_ERROR_ITEM, e.toString())
                 }
-            } catch (e: Exception) {
-                sendUIMessage(Messages.ADD_ERROR_ITEM, e.toString())
             }
 
         }
