@@ -2,6 +2,7 @@ package replete
 
 import android.os.*
 import com.eclipsesource.v8.*
+import com.eclipsesource.v8.utils.V8Runnable
 import java.io.*
 import java.lang.StringBuilder
 import java.net.HttpURLConnection
@@ -41,7 +42,7 @@ class VMHandler(
     val mainLooper: Looper,
     val sendUIMessage: (Messages, Any?) -> Unit,
     val bundleGetContents: (String) -> String?,
-    val toAbsolutePath: (String) -> File
+    val toAbsolutePath: (String) -> File?
 ) : Handler(mainLooper) {
     var vm: V8? = null
 
@@ -501,8 +502,14 @@ class VMHandler(
 
     private val repleteIsDirectory = JavaCallback { receiver, params ->
         if (params.length() == 1) {
-            val path = params.getString(0)
-            return@JavaCallback toAbsolutePath(path).isDirectory
+            val path = toAbsolutePath(params.getString(0))
+
+            if (path != null) {
+                return@JavaCallback path.isDirectory
+            } else {
+                return@JavaCallback V8.getUndefined()
+            }
+
         } else {
             return@JavaCallback V8.getUndefined()
         }
@@ -510,10 +517,10 @@ class VMHandler(
 
     private val repleteListFiles = JavaCallback { receiver, params ->
         if (params.length() == 1) {
-            val path = params.getString(0)
+            val path = toAbsolutePath(params.getString(0))
             val ret = V8Array(vm)
 
-            toAbsolutePath(path).list().forEach { p -> ret.push(p.toString()) }
+            path?.list()?.forEach { p -> ret.push(p.toString()) }
 
             return@JavaCallback ret
         } else {
@@ -526,7 +533,7 @@ class VMHandler(
             val path = params.getString(0)
 
             try {
-                toAbsolutePath(path).delete()
+                toAbsolutePath(path)?.delete()
             } catch (e: IOException) {
                 sendUIMessage(Messages.ADD_ERROR_ITEM, e.toString())
             }
@@ -539,19 +546,20 @@ class VMHandler(
         if (params.length() == 2) {
             val fromPath = params.getString(0)
             val toPath = params.getString(1)
-            val fromStream = toAbsolutePath(fromPath).inputStream()
-            val toStream = toAbsolutePath(toPath).outputStream()
+            val fromStream = toAbsolutePath(fromPath)?.inputStream()
+            val toStream = toAbsolutePath(toPath)?.outputStream()
 
-            try {
-                fromStream.copyTo(toStream)
-                fromStream.close()
-                toStream.close()
-            } catch (e: IOException) {
-                fromStream.close()
-                toStream.close()
-                sendUIMessage(Messages.ADD_ERROR_ITEM, e.toString())
+            if (fromStream != null && toStream != null) {
+                try {
+                    fromStream.copyTo(toStream)
+                    fromStream.close()
+                    toStream.close()
+                } catch (e: IOException) {
+                    fromStream.close()
+                    toStream.close()
+                    sendUIMessage(Messages.ADD_ERROR_ITEM, e.toString())
+                }
             }
-
         }
         return@JavaCallback V8.getUndefined()
     }
@@ -562,7 +570,7 @@ class VMHandler(
             val absPath = toAbsolutePath(path)
 
             try {
-                if (!absPath.exists()) {
+                if (absPath != null && !absPath.exists()) {
                     absPath.mkdirs()
                 }
             } catch (e: Exception) {
@@ -644,14 +652,13 @@ class VMHandler(
         if (params.length() == 1) {
             val path = params.getString(0)
             val item = toAbsolutePath(path)
-
-            val itemType = if (item.isFile) "file" else if (item.isDirectory) "directory" else "unknown"
-
             val ret = V8Object(vm)
 
-            ret.add("type", itemType)
-            ret.add("modified", item.lastModified().toDouble())
-
+            if (item != null) {
+                val itemType = if (item.isFile) "file" else if (item.isDirectory) "directory" else "unknown"
+                ret.add("type", itemType)
+                ret.add("modified", item.lastModified().toDouble())
+            }
 
             return@JavaCallback ret
         } else {
@@ -678,7 +685,6 @@ class VMHandler(
 
             openWriteFiles[path] =
                     FileOutputStream(toAbsolutePath(path), append).writer(Charsets.UTF_8)
-
             return@JavaCallback path
         } else {
             return@JavaCallback "0"
@@ -738,9 +744,15 @@ class VMHandler(
     private val repleteFileInputStreamOpen = JavaCallback { receiver, params ->
         if (params.length() == 1) {
             val path = params.getString(0)
-            openInputStreams[path] = toAbsolutePath(path).inputStream()
+            val apath = toAbsolutePath(path)
 
-            return@JavaCallback path
+            if (apath != null) {
+                openInputStreams[path] = apath.inputStream()
+                return@JavaCallback path
+            } else {
+                return@JavaCallback "0"
+            }
+
         } else {
             return@JavaCallback "0"
         }
@@ -782,11 +794,15 @@ class VMHandler(
     private val repleteFileReaderOpen = JavaCallback { receiver, params ->
         if (params.length() == 2) {
             val path = params.getString(0)
+            val apath = toAbsolutePath(path)
             val encoding = params.getString(1)
 
-            openReadFiles[path] = toAbsolutePath(path).inputStream().reader(Charsets.UTF_8)
-
-            return@JavaCallback path
+            if (apath != null) {
+                openReadFiles[path] = apath.inputStream().reader(Charsets.UTF_8)
+                return@JavaCallback path
+            } else {
+                return@JavaCallback "0"
+            }
         } else {
             return@JavaCallback "0"
         }

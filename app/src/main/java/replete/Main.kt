@@ -131,8 +131,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun toAbsolutePath(path: String): File {
-        return filesDir.resolve(if (path.startsWith("/")) path.drop(1) else path)
+    private fun toAbsolutePath(path: String): File? {
+        return if (Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED) {
+            val rpath = if (path.startsWith("/")) path.drop(1) else path
+            val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            dir.mkdirs()
+            dir.resolve(rpath)
+        } else {
+            null
+        }
     }
 
     private var selectedPosition = -1
