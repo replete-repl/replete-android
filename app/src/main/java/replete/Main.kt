@@ -403,6 +403,7 @@ class MainActivity : AppCompatActivity() {
         val replHistory: ListView = findViewById(R.id.repl_history)
         evalButton = findViewById(R.id.eval_button)
 
+        inputField!!.requestFocus()
         inputField!!.hint = "Type in here"
         inputField!!.setHintTextColor(Color.GRAY)
 
