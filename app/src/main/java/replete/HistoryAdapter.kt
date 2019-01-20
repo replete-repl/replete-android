@@ -6,6 +6,7 @@ import android.text.SpannableString
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AnimationUtils
 import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.TextView
@@ -27,6 +28,8 @@ fun inflateItem(viewHolder: HistoryAdapter.ViewHolder, item: Item) {
 
 class HistoryAdapter(context: Context, id: Int, val parent: ListView) :
     ArrayAdapter<Item>(context, id) {
+
+    val animation = AnimationUtils.loadAnimation(parent.context, R.anim.entry_appears)
 
     fun update(item: Item) {
         this.add(item)
@@ -50,6 +53,8 @@ class HistoryAdapter(context: Context, id: Int, val parent: ListView) :
             if (item != null) {
                 inflateItem(viewHolder, item)
             }
+
+            _itemView.startAnimation(animation)
 
             return _itemView
         } else {
