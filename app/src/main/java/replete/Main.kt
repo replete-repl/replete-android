@@ -404,7 +404,7 @@ class MainActivity : AppCompatActivity() {
         evalButton = findViewById(R.id.eval_button)
 
         inputField!!.requestFocus()
-        inputField!!.hint = "Type in here"
+        inputField!!.hint = "Enter form here"
         inputField!!.setHintTextColor(Color.GRAY)
 
         evalButton!!.isEnabled = false
