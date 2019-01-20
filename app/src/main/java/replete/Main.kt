@@ -325,6 +325,42 @@ class MainActivity : AppCompatActivity() {
         ret.release()
     }
 
+    inner class CopyActionCallback(val parent: AdapterView<*>, val clipboard: ClipboardManager) : ActionMode.Callback {
+
+        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+            val inflater = mode.menuInflater
+            inflater.inflate(R.menu.menu_actions, menu)
+            return true
+        }
+
+        override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean {
+            return false
+        }
+
+        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+            return when (item.itemId) {
+                R.id.copy_action -> {
+                    val _item = parent.getItemAtPosition(selectedPosition)
+
+                    if (_item != null) {
+                        val sitem = parent.getItemAtPosition(selectedPosition) as Item
+                        clipboard.primaryClip = ClipData.newPlainText("input", sitem.text)
+                        selectedPosition = -1
+                        (selectedView as View).setBackgroundColor(Color.rgb(255, 255, 255))
+                    }
+
+                    mode.finish()
+                    true
+                }
+                else -> false
+            }
+        }
+
+        override fun onDestroyActionMode(mode: ActionMode?) {
+
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -387,36 +423,14 @@ class MainActivity : AppCompatActivity() {
                     view.setBackgroundColor(Color.rgb(219, 220, 255))
                     selectedView = view
 
-                    (selectedView as View).startActionMode(object : ActionMode.Callback {
-
-                        override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
-                            val inflater = mode.menuInflater
-                            inflater.inflate(R.menu.menu_actions, menu)
-                            return true
-                        }
-
-                        override fun onPrepareActionMode(mode: ActionMode?, menu: Menu?): Boolean {
-                            return false
-                        }
-
-                        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
-                            return when (item.itemId) {
-                                R.id.copy_action -> {
-                                    val sitem = parent.getItemAtPosition(selectedPosition) as Item
-                                    clipboard.primaryClip = ClipData.newPlainText("input", sitem.text)
-                                    selectedPosition = -1
-                                    (selectedView as View).setBackgroundColor(Color.rgb(255, 255, 255))
-                                    mode.finish()
-                                    true
-                                }
-                                else -> false
-                            }
-                        }
-
-                        override fun onDestroyActionMode(mode: ActionMode?) {
-
-                        }
-                    }, ActionMode.TYPE_FLOATING)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        (selectedView as View).startActionMode(
+                            CopyActionCallback(parent, clipboard),
+                            ActionMode.TYPE_FLOATING
+                        )
+                    } else {
+                        (selectedView as View).startActionMode(CopyActionCallback(parent, clipboard))
+                    }
                 }
             }
         }
