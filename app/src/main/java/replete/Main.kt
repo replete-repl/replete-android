@@ -18,6 +18,7 @@ import android.view.animation.Animation
 import com.eclipsesource.v8.V8
 import com.eclipsesource.v8.V8Array
 import java.io.*
+import java.util.*
 
 fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
     return s.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
@@ -127,7 +128,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun displayOutput(output: SpannableString) {
         if (!suppressPrinting) {
-            adapter!!.update(Item(output, ItemType.OUTPUT))
+            Timer().schedule(object : TimerTask() {
+                override fun run() {
+                    runOnUiThread { adapter!!.update(Item(output, ItemType.OUTPUT)) }
+                }
+            }, 200)
         }
     }
 
