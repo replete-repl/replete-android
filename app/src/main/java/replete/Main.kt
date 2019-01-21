@@ -282,6 +282,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onConfigurationChanged(cfg: Configuration) {
+        super.onConfigurationChanged(cfg)
         if (resources.configuration.orientation != cfg.orientation) {
             updateWidth()
         }
