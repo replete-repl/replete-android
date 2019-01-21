@@ -13,8 +13,6 @@ import android.os.*
 import android.text.*
 import android.text.style.ForegroundColorSpan
 import android.util.DisplayMetrics
-import android.view.animation.AlphaAnimation
-import android.view.animation.Animation
 import com.eclipsesource.v8.V8
 import com.eclipsesource.v8.V8Array
 import java.io.*
@@ -230,55 +228,6 @@ class MainActivity : AppCompatActivity() {
         } else {
             "iPhone"
         }
-    }
-
-    val fadeIn = AlphaAnimation(0.3f, 1.0f)
-    val fadeOut = AlphaAnimation(1.0f, 0.3f)
-
-    private fun stopLoadingItem() {
-        fadeIn.cancel()
-        fadeIn.reset()
-        fadeOut.reset()
-    }
-
-    private fun startLoadingItem(view: View) {
-        val duration: Long = 500
-
-        fadeIn.duration = duration
-        fadeIn.fillAfter = true
-
-        fadeOut.duration = duration
-        fadeOut.fillAfter = true
-
-        fadeOut.setAnimationListener(object : Animation.AnimationListener {
-            override fun onAnimationEnd(animation: Animation?) {
-                view.startAnimation(fadeIn)
-            }
-
-            override fun onAnimationStart(animation: Animation?) {
-
-            }
-
-            override fun onAnimationRepeat(animation: Animation?) {
-
-            }
-        })
-
-        fadeIn.setAnimationListener(object : Animation.AnimationListener {
-            override fun onAnimationEnd(animation: Animation?) {
-                view.startAnimation(fadeOut)
-            }
-
-            override fun onAnimationStart(animation: Animation?) {
-
-            }
-
-            override fun onAnimationRepeat(animation: Animation?) {
-
-            }
-        })
-
-        view.startAnimation(fadeOut)
     }
 
     override fun onConfigurationChanged(cfg: Configuration) {
