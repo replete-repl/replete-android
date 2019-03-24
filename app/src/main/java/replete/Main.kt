@@ -17,7 +17,7 @@ import com.eclipsesource.v8.V8
 import com.eclipsesource.v8.V8Array
 import java.io.*
 import android.os.StrictMode
-
+import java.lang.IndexOutOfBoundsException
 
 fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
     return s.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
@@ -114,7 +114,10 @@ class MainActivity : AppCompatActivity() {
         val s = inputField!!.text
 
         s.replace(0, s.length, text, 0, text.length)
-        inputField!!.setSelection(cursor)
+        try {
+            inputField!!.setSelection(cursor)
+        } catch (e: IndexOutOfBoundsException) {
+        }
     }
 
     private fun displayError(error: String) {
@@ -373,27 +376,24 @@ class MainActivity : AppCompatActivity() {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
         replHistory.setOnItemClickListener { parent, view, position, id ->
-            val item = parent.getItemAtPosition(position) as Item
-            if (item.type == ItemType.INPUT) {
-                if (position == selectedPosition) {
-                    selectedPosition = -1
-                    view.setBackgroundColor(Color.rgb(255, 255, 255))
-                } else {
-                    if (selectedPosition != -1 && selectedView != null) {
-                        (selectedView as View).setBackgroundColor(Color.rgb(255, 255, 255))
-                    }
-                    selectedPosition = position
-                    view.setBackgroundColor(Color.rgb(219, 220, 255))
-                    selectedView = view
+            if (position == selectedPosition) {
+                selectedPosition = -1
+                view.setBackgroundColor(Color.rgb(255, 255, 255))
+            } else {
+                if (selectedPosition != -1 && selectedView != null) {
+                    (selectedView as View).setBackgroundColor(Color.rgb(255, 255, 255))
+                }
+                selectedPosition = position
+                view.setBackgroundColor(Color.rgb(219, 220, 255))
+                selectedView = view
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        (selectedView as View).startActionMode(
-                            CopyActionCallback(parent, clipboard),
-                            ActionMode.TYPE_FLOATING
-                        )
-                    } else {
-                        (selectedView as View).startActionMode(CopyActionCallback(parent, clipboard))
-                    }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    (selectedView as View).startActionMode(
+                        CopyActionCallback(parent, clipboard),
+                        ActionMode.TYPE_FLOATING
+                    )
+                } else {
+                    (selectedView as View).startActionMode(CopyActionCallback(parent, clipboard))
                 }
             }
         }
