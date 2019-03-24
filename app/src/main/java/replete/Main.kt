@@ -16,6 +16,7 @@ import android.util.DisplayMetrics
 import com.eclipsesource.v8.V8
 import com.eclipsesource.v8.V8Array
 import java.io.*
+import java.lang.IndexOutOfBoundsException
 
 fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
     return s.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
@@ -112,7 +113,10 @@ class MainActivity : AppCompatActivity() {
         val s = inputField!!.text
 
         s.replace(0, s.length, text, 0, text.length)
-        inputField!!.setSelection(cursor)
+        try {
+            inputField!!.setSelection(cursor)
+        } catch (e: IndexOutOfBoundsException) {
+        }
     }
 
     private fun displayError(error: String) {
