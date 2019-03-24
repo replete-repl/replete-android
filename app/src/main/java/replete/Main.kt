@@ -16,6 +16,8 @@ import android.util.DisplayMetrics
 import com.eclipsesource.v8.V8
 import com.eclipsesource.v8.V8Array
 import java.io.*
+import android.os.StrictMode
+
 
 fun setTextSpanColor(s: SpannableString, color: Int, start: Int, end: Int) {
     return s.setSpan(ForegroundColorSpan(color), start, end, Spannable.SPAN_INCLUSIVE_EXCLUSIVE)
@@ -320,6 +322,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val policy = StrictMode.ThreadPolicy.Builder().permitAll().build()
+        StrictMode.setThreadPolicy(policy)
 
         uiHandler = object : Handler(Looper.getMainLooper()) {
             override fun handleMessage(msg: Message) {
