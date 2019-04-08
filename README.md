@@ -1,4 +1,4 @@
-# Replete
+# Replete Android
 
 ClojureScript REPL Android app.
 
