@@ -12,6 +12,7 @@ import android.content.res.Configuration
 import android.os.*
 import android.text.*
 import android.text.style.ForegroundColorSpan
+import android.util.AttributeSet
 import android.util.DisplayMetrics
 import com.eclipsesource.v8.V8
 import com.eclipsesource.v8.V8Array
@@ -74,6 +75,19 @@ enum class Messages(val value: Int) {
     RELEASE_OBJ(13),
     NS_LOADED(16),
     INIT_FAILED(17),
+}
+
+enum class Buttons(val value: String) {
+    PAREN("("),
+    SQUARE("["),
+    CURLY("{"),
+    COLON(":"),
+    DBL_QUOTE("\""),
+    HASH("#"),
+    PERCENT("%"),
+    QUOTE("'"),
+    SYNTAX_QUOTE("`"),
+    DEREF("@"),
 }
 
 class MainActivity : AppCompatActivity() {
@@ -323,6 +337,30 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    inner class ToolBarButton(context: Context, val toolbar: LinearLayout, val text: String) : Button(context) {
+        init {
+            val button = LayoutInflater.from(context).inflate(R.layout.button, toolbar, false) as Button
+            button.text = text
+            toolbar.addView(button)
+
+            button.setOnClickListener {
+                val field = inputField!!
+                val cursor = field.selectionStart
+                when (text) {
+                    Buttons.DBL_QUOTE.value -> autoCloseAndMove(Buttons.DBL_QUOTE.value)
+                    else -> field.text.insert(cursor, text)
+                }
+            }
+        }
+
+        private fun autoCloseAndMove(ch: String) {
+            val field = inputField!!
+            val cursor = field.selectionStart
+            field.text.insert(cursor, ch + ch)
+            field.setSelection(cursor + 1)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -356,6 +394,14 @@ class MainActivity : AppCompatActivity() {
         initializeVMThread()
         setDeviceType()
         setContentView(R.layout.activity_main)
+
+        val toolbarBlock = findViewById<HorizontalScrollView>(R.id.toolbar)
+        val toolbar = findViewById<LinearLayout>(R.id.toolbar_list)
+        val buttons = listOf("(", "[", "{", ":", "\"", "#", "%", "'", "`", "@")
+
+        buttons.forEach {
+            ToolBarButton(this, toolbar, it)
+        }
 
         inputField = findViewById(R.id.input)
         val replHistory: ListView = findViewById(R.id.repl_history)
