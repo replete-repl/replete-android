@@ -431,7 +431,12 @@ class MainActivity : AppCompatActivity() {
 
             override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {
                 if (p0 != null && p0.length > p1 && p0[p1] == "\n"[0]) {
-                    enterPressed = true
+                    if (p1 == p0.length - 1 && evalButton!!.isEnabled) {
+                        inputField!!.text.delete(p1, p0.length)
+                        evalButton!!.callOnClick()
+                    } else {
+                        enterPressed = true
+                    }
                 }
             }
         })
