@@ -340,6 +340,12 @@ class VMHandler(
                 null
             }
 
+            val followRedirects = try {
+                opts.getBoolean("follow-redirects")
+            } catch (e: V8ResultUndefined) {
+                false
+            }
+            
             val userAgent = try {
                 opts.getString("user-agent")
             } catch (e: V8ResultUndefined) {
@@ -367,6 +373,7 @@ class VMHandler(
                 conn.requestMethod = method
                 conn.readTimeout = timeout
                 conn.connectTimeout = timeout
+                conn.instanceFollowRedirects = followRedirects
 
                 if (userAgent != null) {
                     conn.setRequestProperty("User-Agent", userAgent)
