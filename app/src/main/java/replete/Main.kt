@@ -9,6 +9,7 @@ import android.widget.*
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.res.Configuration
+import android.graphics.Typeface
 import android.os.*
 import android.text.*
 import android.text.style.ForegroundColorSpan
@@ -357,6 +358,8 @@ class MainActivity : AppCompatActivity() {
         setDeviceType()
         setContentView(R.layout.activity_main)
 
+        val typeface = Typeface.createFromAsset(getAssets(), "fonts/FiraCode-Regular.otf")
+
         inputField = findViewById(R.id.input)
         val replHistory: ListView = findViewById(R.id.repl_history)
         evalButton = findViewById(R.id.eval_button)
@@ -364,11 +367,12 @@ class MainActivity : AppCompatActivity() {
         inputField!!.requestFocus()
         inputField!!.hint = "Enter form here"
         inputField!!.setHintTextColor(Color.GRAY)
+        inputField!!.setTypeface(typeface)
 
         evalButton!!.isEnabled = false
         evalButton!!.setTextColor(Color.GRAY)
 
-        adapter = HistoryAdapter(this, R.layout.list_item, replHistory)
+        adapter = HistoryAdapter(this, R.layout.list_item, typeface, replHistory)
 
         replHistory.adapter = adapter
         replHistory.divider = null

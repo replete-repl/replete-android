@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.TextView
+import android.graphics.Typeface
 
 enum class ItemType {
     INPUT, OUTPUT, ERROR
@@ -16,8 +17,9 @@ enum class ItemType {
 
 data class Item(val text: SpannableString, val type: ItemType)
 
-fun inflateItem(viewHolder: HistoryAdapter.ViewHolder, item: Item) {
+fun inflateItem(viewHolder: HistoryAdapter.ViewHolder, item: Item, typeface: Typeface) {
     viewHolder.item.text = item.text
+    viewHolder.item.setTypeface(typeface)
     when (item.type) {
         ItemType.INPUT -> viewHolder.item.setTextColor(Color.DKGRAY)
         ItemType.OUTPUT -> viewHolder.item.setTextColor(Color.BLACK)
@@ -25,7 +27,7 @@ fun inflateItem(viewHolder: HistoryAdapter.ViewHolder, item: Item) {
     }
 }
 
-class HistoryAdapter(context: Context, id: Int, val parent: ListView) :
+class HistoryAdapter(context: Context, id: Int, val typeface: Typeface, val parent: ListView) :
     ArrayAdapter<Item>(context, id) {
 
     fun update(item: Item) {
@@ -48,13 +50,13 @@ class HistoryAdapter(context: Context, id: Int, val parent: ListView) :
             _itemView.tag = viewHolder
 
             if (item != null) {
-                inflateItem(viewHolder, item)
+                inflateItem(viewHolder, item, typeface)
             }
 
             return _itemView
         } else {
             if (item != null) {
-                inflateItem(itemView.tag as ViewHolder, item)
+                inflateItem(itemView.tag as ViewHolder, item, typeface)
             }
             return itemView
         }
