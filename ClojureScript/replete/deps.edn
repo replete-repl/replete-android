@@ -1,4 +1,4 @@
 {:deps {org.clojure/clojure {:mvn/version "1.10.0"}
         org.clojure/clojurescript {:mvn/version "1.10.520"}
         github-replete-repl/replete-shared {:git/url "https://github.com/replete-repl/replete-shared"
-                                            :sha "00307566f2f0fc5e83fcb5baa79b3fd85cd4d226"}}}
+                                            :sha "14537e549988902edc9dfdfc36f85245eb4e103f"}}}
