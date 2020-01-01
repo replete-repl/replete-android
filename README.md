@@ -1,8 +1,8 @@
-# Replete Android
+# Replete REPL Android
 
 ClojureScript REPL Android app.
 
-Interested in iOS instead? See [Replete for iOS](https://github.com/replete-repl/replete-ios).
+Interested in iOS instead? See [Replete REPL for iOS](https://github.com/replete-repl/replete-ios).
 
 # Running
 
@@ -15,6 +15,6 @@ Happy to take PRs!
 
 # License
 
-Copyright © 2018–2019 Roman Liutikov, Mike Fikes, and Contributors
+Copyright © 2018–2020 Roman Liutikov, Mike Fikes, and Contributors
 
 Distributed under the Eclipse Public License either version 1.0 or (at your option) any later version.
