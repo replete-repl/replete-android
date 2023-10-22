@@ -93,22 +93,37 @@ class VMHandler(
                     vm.executeScript(depsScript)
                 }
             }
-
-            vm.executeScript("goog.isProvided_ = function(x) { return false; };")
-            vm.executeScript("goog.require = function (name) { return CLOSURE_IMPORT_SCRIPT(goog.dependencies_.nameToPath[name]); };")
+            
             vm.executeScript("goog.require('cljs.core');")
+            vm.executeScript("goog.isProvided_ = function(x) { return false; };")
             vm.executeScript(
-                "cljs.core._STAR_loaded_libs_STAR_ = cljs.core.into.call(null, cljs.core.PersistentHashSet.EMPTY, [\"cljs.core\"]);\n" +
-                        "goog.require = function (name, reload) {\n" +
-                        "    if(!cljs.core.contains_QMARK_(cljs.core._STAR_loaded_libs_STAR_, name) || reload) {\n" +
-                        "        var AMBLY_TMP = cljs.core.PersistentHashSet.EMPTY;\n" +
-                        "        if (cljs.core._STAR_loaded_libs_STAR_) {\n" +
-                        "            AMBLY_TMP = cljs.core._STAR_loaded_libs_STAR_;\n" +
-                        "        }\n" +
-                        "        cljs.core._STAR_loaded_libs_STAR_ = cljs.core.into.call(null, AMBLY_TMP, [name]);\n" +
-                        "        CLOSURE_IMPORT_SCRIPT(goog.dependencies_.nameToPath[name]);\n" +
-                        "    }\n" +
-                        "};"
+                "goog.require__ = goog.require;\n" +
+                "goog.require = (src, reload) => {\n" +
+                "  if (reload === \"reload-all\") {\n" +
+                "    goog.cljsReloadAll_ = true;\n" +
+                "  }\n" +
+                "  if (reload || goog.cljsReloadAll_) {\n" +
+                "    if (goog.debugLoader_) {\n" +
+                "      let path = goog.debugLoader_.getPathFromDeps_(src);\n" +
+                "      goog.object.remove(goog.debugLoader_.written_, path);\n" +
+                "      goog.object.remove(goog.debugLoader_.written_, goog.basePath + path);\n" +
+                "    } else {\n" +
+                "      let path = goog.object.get(goog.dependencies_.nameToPath, src);\n" +
+                "      goog.object.remove(goog.dependencies_.visited, path);\n" +
+                "      goog.object.remove(goog.dependencies_.written, path);\n" +
+                "      goog.object.remove(goog.dependencies_.visited, goog.basePath + path);\n" +
+                "    }\n" +
+                "  }\n" +
+                "  let ret = goog.require__(src);\n" +
+                "  if (reload === \"reload-all\") {\n" +
+                "    goog.cljsReloadAll_ = false;\n" +
+                "  }\n" +
+                "  if (goog.isInModuleLoader_()) {\n" +
+                "    return goog.module.getInternal_(src);\n" +
+                "  } else {\n" +
+                "    return ret;\n" +
+                "  }\n" +
+                "};"
             )
 
             vm.executeScript("goog.provide('cljs.user');")
