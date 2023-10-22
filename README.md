@@ -15,6 +15,6 @@ Happy to take PRs!
 
 # License
 
-Copyright © 2018–2020 Roman Liutikov, Mike Fikes, and Contributors
+Copyright © 2018–2023 Roman Liutikov, Mike Fikes, and Contributors
 
 Distributed under the Eclipse Public License either version 1.0 or (at your option) any later version.
