@@ -1,4 +1,4 @@
-package replete
+package com.fikesfarm.Replete
 
 import android.os.*
 import com.eclipsesource.v8.*
@@ -345,7 +345,7 @@ class VMHandler(
             } catch (e: V8ResultUndefined) {
                 false
             }
-            
+
             val userAgent = try {
                 opts.getString("user-agent")
             } catch (e: V8ResultUndefined) {
@@ -691,7 +691,7 @@ class VMHandler(
             val encoding = params.getString(2)
 
             openWriteFiles[path] =
-                    FileOutputStream(toAbsolutePath(path), append).writer(Charsets.UTF_8)
+                FileOutputStream(toAbsolutePath(path), append).writer(Charsets.UTF_8)
             return@JavaCallback path
         } else {
             return@JavaCallback "0"

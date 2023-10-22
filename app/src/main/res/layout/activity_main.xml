@@ -20,7 +20,6 @@
             android:text="Eval"
             android:layout_width="64dp"
             android:layout_height="0dp" android:id="@+id/eval_button" android:layout_weight="1"
-            style="@style/Widget.AppCompat.Button.Borderless.Colored"
             android:textColor="@android:color/holo_blue_dark" android:layout_marginEnd="8dp"
             android:layout_marginRight="8dp" app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"
