@@ -1,9 +1,9 @@
-package replete
+package com.fikesfarm.Replete
 
+import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Color
-import android.support.v7.app.AppCompatActivity
 import android.view.*
 import android.widget.*
 import android.content.ClipData
@@ -77,7 +77,7 @@ enum class Messages(val value: Int) {
     INIT_FAILED(17),
 }
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private var isVMLoaded = false
 
@@ -307,7 +307,7 @@ class MainActivity : AppCompatActivity() {
 
                     if (_item != null) {
                         val sitem = parent.getItemAtPosition(selectedPosition) as Item
-                        clipboard.primaryClip = ClipData.newPlainText("input", sitem.text)
+                        clipboard.setPrimaryClip(ClipData.newPlainText("input", sitem.text))
                         selectedPosition = -1
                         (selectedView as View).setBackgroundColor(Color.rgb(255, 255, 255))
                     }

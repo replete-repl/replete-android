@@ -1,4 +1,4 @@
-package replete
+package com.fikesfarm.Replete
 
 fun <T>time(msg: String, block: () -> T): T {
     val start = System.currentTimeMillis()
