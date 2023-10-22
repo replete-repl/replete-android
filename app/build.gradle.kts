@@ -11,7 +11,7 @@ android {
         applicationId = "com.fikesfarm.Replete"
         minSdk = 24
         targetSdk = 33
-        versionCode = 3
+        versionCode = 18
         versionName = "2.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
